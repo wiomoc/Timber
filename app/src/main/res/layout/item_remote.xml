@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:layout_width="fill_parent"
+    android:layout_height="?android:attr/listPreferredItemHeight"
+    android:minHeight="?android:attr/listPreferredItemHeight"
+    android:padding="6dip"
+    android:gravity="fill">
+
+    <ImageView
+        android:layout_width="?android:attr/listPreferredItemHeight"
+        android:layout_height="fill_parent"
+        android:id="@+id/remoteImage"
+        android:adjustViewBounds="true"
+        android:scaleType="centerCrop"
+        android:layout_marginEnd="10dp"
+        android:layout_marginRight="10dp"
+        />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:minHeight="?android:attr/listPreferredItemHeight"
+        android:maxLines="2"
+
+        android:layout_toEndOf="@id/remoteImage"
+        android:layout_toRightOf="@id/remoteImage"
+        android:layout_height="fill_parent"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text=""
+        android:gravity="center_vertical"
+        android:id="@+id/remoteName"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="true"/>
+
+</RelativeLayout>

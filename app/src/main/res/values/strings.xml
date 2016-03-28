@@ -111,6 +111,8 @@
     <string name="number_song_add_playlist"><xliff:g example="1" id="number">%d</xliff:g> song added to playlist.</string>
     <string name="number_songs_add_playlist"><xliff:g example="1" id="number">%d</xliff:g> songs added to playlist.</string>
 
+    <string name="action_remote_search">Remote search</string>
+
 
     <!--do not translate these strings-->
     <string name="app_name" translatable="false">Timber</string>

@@ -11,6 +11,8 @@
     <item android:id="@+id/action_settings" android:title="@string/action_settings"
         android:orderInCategory="101" app:showAsAction="never" />
 
+    <item android:id="@+id/action_remote_search" android:title="@string/action_remote_search"
+        android:orderInCategory="101" app:showAsAction="never" />
     <item
         android:id="@+id/action_search"
         android:orderInCategory="1"

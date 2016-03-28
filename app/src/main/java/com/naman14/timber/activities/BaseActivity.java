@@ -38,6 +38,7 @@ import com.naman14.timber.ITimberService;
 import com.naman14.timber.MusicPlayer;
 import com.naman14.timber.MusicService;
 import com.naman14.timber.R;
+import com.naman14.timber.dialogs.RemoteSelectDialog;
 import com.naman14.timber.listeners.MusicStateListener;
 import com.naman14.timber.slidinguppanel.SlidingUpPanelLayout;
 import com.naman14.timber.subfragments.QuickControlsFragment;
@@ -209,6 +210,10 @@ public class BaseActivity extends ATEActivity implements ServiceConnection, Musi
                 return true;
             case R.id.action_equalizer:
                 NavigationUtils.navigateToEqualizer(this);
+                return true;
+            case R.id.action_remote_search:
+                RemoteSelectDialog remoteSelectDialog = new RemoteSelectDialog();
+                remoteSelectDialog.show(getFragmentManager(),"RemoteSelect");
                 return true;
 
         }
