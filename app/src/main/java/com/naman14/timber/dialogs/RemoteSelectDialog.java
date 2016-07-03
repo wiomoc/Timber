@@ -4,12 +4,15 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DialogFragment;
+import android.app.Fragment;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.support.v7.graphics.Palette;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,6 +25,7 @@ import android.widget.Toast;
 
 import com.naman14.timber.R;
 import com.naman14.timber.remote.RemoteObject;
+import com.naman14.timber.utils.TimberUtils;
 
 /**
  * Created by Christoph on 27.03.2016.
@@ -31,6 +35,7 @@ public class RemoteSelectDialog extends DialogFragment {
     RemoteAdapter adapter;
     RemoteObject connected;
     BroadcastReceiver broadcastReceiver;
+    public static final String FRAGMENT_NAME = "RemoteSelect";
     public static final String REMOTE_FOUND = "de.wiomoc.Timber.RemoteFound";
     public static final String REMOTE_START_SCAN = "de.wiomoc.Timber.StartScan";
     public static final String REMOTE_STOP_SCAN = "de.wiomoc.Timber.StopScan";
@@ -47,7 +52,7 @@ public class RemoteSelectDialog extends DialogFragment {
         Activity activity = getActivity();
         activity.sendBroadcast(new Intent(REMOTE_START_SCAN));
         adapter = new RemoteAdapter(activity);
-        adapter.add(new RemoteObject(0, "Local", null));
+        adapter.add(new RemoteObject(0, "Local", BitmapFactory.decodeResource(activity.getResources(),R.mipmap.ic_launcher)));
         broadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -65,6 +70,11 @@ public class RemoteSelectDialog extends DialogFragment {
 
                         } else if (state == REMOTE_ERROR) {
                             Toast.makeText(context,"Error, Remote:"+connected.name,Toast.LENGTH_SHORT).show();
+                        }
+                        Fragment prev = getFragmentManager().findFragmentByTag(FRAGMENT_NAME);
+                        if (prev != null) {
+                            DialogFragment df = (DialogFragment) prev;
+                            df.dismiss();
                         }
 
                         break;
@@ -88,7 +98,7 @@ public class RemoteSelectDialog extends DialogFragment {
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
         builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener(){
                     public void onClick(DialogInterface dialog, int id) {
-                        getActivity().sendBroadcast(new Intent(REMOTE_STOP_SCAN));
+
                     }
                 }
 
@@ -96,16 +106,21 @@ public class RemoteSelectDialog extends DialogFragment {
         return builder.create();
     }
     @Override
-    public void onAttach(Activity activity){
+    public void onStart(){
+        super.onStart();
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(REMOTE_FOUND);
         intentFilter.addAction(REMOTE_STATE_CHANGE);
+        Activity activity = getActivity();
         activity.registerReceiver(broadcastReceiver, intentFilter);
         activity.sendBroadcast(new Intent(REMOTE_START_SCAN));
     }
     @Override
-    public void onDetach(){
-        getActivity().unregisterReceiver(broadcastReceiver);
+    public void onStop(){
+        super.onStop();
+        Activity activity =  getActivity();
+        activity.unregisterReceiver(broadcastReceiver);
+        activity.sendBroadcast(new Intent(REMOTE_STOP_SCAN));
     }
     private class RemoteAdapter extends ArrayAdapter<RemoteObject> {
         private Activity con;
@@ -125,10 +140,37 @@ public class RemoteSelectDialog extends DialogFragment {
 
             }
             rowView.setTag(remoteObject);
-            ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
-            imgview.setImageBitmap(remoteObject.image);
-            TextView textView = (TextView) rowView.findViewById(R.id.remoteName);
+
+
+            final TextView textView = (TextView) rowView.findViewById(R.id.remoteName);
             textView.setText(remoteObject.name);
+            if(remoteObject.image!=null) {
+                ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
+                imgview.setImageBitmap(remoteObject.image);
+                final View finalRowView = rowView;
+                new Palette.Builder(remoteObject.image).generate(new Palette.PaletteAsyncListener() {
+                    @Override
+                    public void onGenerated(Palette palette) {
+                        Palette.Swatch swatch = palette.getVibrantSwatch();
+                        if (swatch != null) {
+                            int color = swatch.getRgb();
+                            finalRowView.setBackgroundColor(color);
+                            int textColor = TimberUtils.getBlackWhiteColor(swatch.getTitleTextColor());
+                            textView.setTextColor(textColor);
+                        } else {
+                            Palette.Swatch mutedSwatch = palette.getMutedSwatch();
+                            if (mutedSwatch != null) {
+                                int color = mutedSwatch.getRgb();
+                                finalRowView.setBackgroundColor(color);
+                                int textColor = TimberUtils.getBlackWhiteColor(mutedSwatch.getTitleTextColor());
+                                textView.setTextColor(textColor);
+                            }
+                        }
+
+
+                    }
+                });
+            }
             return rowView;
 
         }

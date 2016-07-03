@@ -213,7 +213,7 @@ public class BaseActivity extends ATEActivity implements ServiceConnection, Musi
                 return true;
             case R.id.action_remote_search:
                 RemoteSelectDialog remoteSelectDialog = new RemoteSelectDialog();
-                remoteSelectDialog.show(getFragmentManager(),"RemoteSelect");
+                remoteSelectDialog.show(getFragmentManager(),RemoteSelectDialog.FRAGMENT_NAME);
                 return true;
 
         }

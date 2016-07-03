@@ -61,12 +61,17 @@ import android.support.v7.graphics.Palette;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.naman14.timber.dialogs.RemoteSelectDialog;
 import com.naman14.timber.helpers.MediaButtonIntentReceiver;
 import com.naman14.timber.helpers.MusicPlaybackTrack;
 import com.naman14.timber.permissions.Nammu;
 import com.naman14.timber.provider.MusicPlaybackState;
 import com.naman14.timber.provider.RecentStore;
 import com.naman14.timber.provider.SongPlayCount;
+import com.naman14.timber.remote.IRemote;
+import com.naman14.timber.remote.RemoteObject;
+import com.naman14.timber.remote.UpnpRenderer;
+import com.naman14.timber.remote.UpnpRendererScanner;
 import com.naman14.timber.utils.NavigationUtils;
 import com.naman14.timber.utils.PreferencesUtility;
 import com.naman14.timber.utils.TimberUtils;
@@ -143,7 +148,7 @@ public class MusicService extends Service {
             "audio._id AS _id", MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.ARTIST_ID
+            MediaStore.Audio.Media.ARTIST_ID,MediaStore.Audio.Media.DURATION
     };
     private static final String[] ALBUM_PROJECTION = new String[]{
             MediaStore.Audio.Albums.ALBUM, MediaStore.Audio.Albums.ARTIST,
@@ -183,7 +188,8 @@ public class MusicService extends Service {
     private long mNotificationPostTime = 0;
     private boolean mQueueIsSaveable = true;
     private boolean mPausedByTransientLossOfFocus = false;
-
+    private ArrayList<IRemote> remoteObjects = new ArrayList<>();
+    private UpnpRendererScanner upnpRendererScanner;
     private MediaSessionCompat mSession;
 
     private ComponentName mMediaButtonReceiverComponent;
@@ -316,6 +322,9 @@ public class MusicService extends Service {
         filter.addAction(PREVIOUS_FORCE_ACTION);
         filter.addAction(REPEAT_ACTION);
         filter.addAction(SHUFFLE_ACTION);
+        filter.addAction(RemoteSelectDialog.REMOTE_START_SCAN);
+        filter.addAction(RemoteSelectDialog.REMOTE_STOP_SCAN);
+        filter.addAction(RemoteSelectDialog.REMOTE_CONNECT);
         // Attach the broadcast listener
         registerReceiver(mIntentReceiver, filter);
 
@@ -506,6 +515,39 @@ public class MusicService extends Service {
             cycleRepeat();
         } else if (SHUFFLE_ACTION.equals(action)) {
             cycleShuffle();
+        } else if (RemoteSelectDialog.REMOTE_START_SCAN.equals(action)) {
+            if (upnpRendererScanner == null) upnpRendererScanner = new UpnpRendererScanner();
+            upnpRendererScanner.startScan(new UpnpRendererScanner.ScannerResult() {
+                @Override
+                public void onRenderFound(final UpnpRenderer rend) {
+                    Log.d("Found", rend.getName());
+                    remoteObjects.add(rend);
+                    Intent intent = new Intent(RemoteSelectDialog.REMOTE_FOUND);
+                    intent.putExtra("Remote", new RemoteObject(remoteObjects.size(), rend.getName(), rend.getImage()));
+
+                    sendBroadcast(intent);
+                }
+            });
+        } else if (RemoteSelectDialog.REMOTE_STOP_SCAN.equals(action)) {
+
+            if (upnpRendererScanner != null) upnpRendererScanner.stopScan();
+        } else if (RemoteSelectDialog.REMOTE_CONNECT.equals(action)) {
+            int id = intent.getIntExtra(RemoteSelectDialog.REMOTE_ID, 0);
+            if (upnpRendererScanner != null) upnpRendererScanner.stopScan();
+            if (id == 0) {
+                mPlayer.setRemote(null);
+            } else {
+
+                IRemote rend = remoteObjects.get(id - 1);
+                if (mPlayer.remote!=rend) {
+                    Intent intentChange = new Intent(RemoteSelectDialog.REMOTE_STATE_CHANGE);
+                    intentChange.putExtra(RemoteSelectDialog.REMOTE_ID, id);
+                    intentChange.putExtra(RemoteSelectDialog.REMOTE_STATE, RemoteSelectDialog.REMOTE_CONNECTED);
+                    sendBroadcast(intentChange);
+                    mPlayer.setRemote(rend);
+                }
+            }
+
         }
     }
 
@@ -1648,6 +1690,19 @@ public class MusicService extends Service {
 
         return -1;
     }
+    public int getDuration(){
+        synchronized (this) {
+            if (mCursor == null) {
+                return -1;
+            }
+            try {
+                return mCursor.getInt(mCursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DURATION));
+            } catch (IllegalArgumentException e){
+                return -1;
+            }
+
+        }
+    }
 
     public MusicPlaybackTrack getCurrentTrack() {
         return getTrack(mPlayPos);
@@ -2271,7 +2326,9 @@ public class MusicService extends Service {
         private boolean mIsInitialized = false;
 
         private String mNextMediaPath;
+        //private int mDuration = -1;
 
+        IRemote remote = null;
 
         public MultiPlayer(final MusicService service) {
             mService = new WeakReference<MusicService>(service);
@@ -2281,123 +2338,217 @@ public class MusicService extends Service {
 
 
         public void setDataSource(final String path) {
+            Log.d("Multi","setSource"+path);
             mIsInitialized = setDataSourceImpl(mCurrentMediaPlayer, path);
             if (mIsInitialized) {
                 setNextDataSource(null);
             }
+           // mDuration=-1;
         }
 
+        public void setRemote(IRemote remote){
+            Log.d("Multi","setRemote");
+            int position = (int) position();
+            this.stop();
+            this.release();
+            mIsInitialized = true;
+            this.remote = remote;
+            setDataSource(mService.get().getPath());
+            if(position!=-1)this.seek(position);
 
+        }
         private boolean setDataSourceImpl(final MediaPlayer player, final String path) {
-            try {
-                player.reset();
-                player.setOnPreparedListener(null);
-                if (path.startsWith("content://")) {
-                    player.setDataSource(mService.get(), Uri.parse(path));
-                } else {
-                    player.setDataSource(path);
+            Log.d("Multi","setSourceImpl"+path);
+            if(remote==null) {
+                try {
+                    player.reset();
+                    player.setOnPreparedListener(null);
+                    if (path.startsWith("content://")) {
+                        player.setDataSource(mService.get(), Uri.parse(path));
+                    } else {
+                        player.setDataSource(path);
+                    }
+                    player.setAudioStreamType(AudioManager.STREAM_MUSIC);
+
+                    player.prepare();
+                } catch (final IOException todo) {
+
+                    return false;
+                } catch (final IllegalArgumentException todo) {
+
+                    return false;
                 }
-                player.setAudioStreamType(AudioManager.STREAM_MUSIC);
-
-                player.prepare();
-            } catch (final IOException todo) {
-
-                return false;
-            } catch (final IllegalArgumentException todo) {
-
-                return false;
+                player.setOnCompletionListener(this);
+                player.setOnErrorListener(this);
+                return true;
+            }else{
+                Log.d("Dur","0");
+                remote.setMedia(mService.get().getPath());
+                //MediaMetadataRetriever metaRetriever = new MediaMetadataRetriever();
+                Log.d("Dur","1");
+                //metaRetriever.setDataSource(path);
+                Log.d("Dur","2");
+                //String duration = metaRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+                //Log.d("Dur",duration);
+               // mDuration = Integer.parseInt(duration);
+                return true;
             }
-            player.setOnCompletionListener(this);
-            player.setOnErrorListener(this);
-            return true;
         }
 
 
         public void setNextDataSource(final String path) {
-            mNextMediaPath = null;
-            try {
-                mCurrentMediaPlayer.setNextMediaPlayer(null);
-            } catch (IllegalArgumentException e) {
-                Log.i(TAG, "Next media player is current one, continuing");
-            } catch (IllegalStateException e) {
-                Log.e(TAG, "Media player not initialized!");
-                return;
-            }
-            if (mNextMediaPlayer != null) {
-                mNextMediaPlayer.release();
-                mNextMediaPlayer = null;
-            }
-            if (path == null) {
-                return;
-            }
-            mNextMediaPlayer = new MediaPlayer();
-            mNextMediaPlayer.setWakeMode(mService.get(), PowerManager.PARTIAL_WAKE_LOCK);
-            mNextMediaPlayer.setAudioSessionId(getAudioSessionId());
-            if (setDataSourceImpl(mNextMediaPlayer, path)) {
-                mNextMediaPath = path;
-                mCurrentMediaPlayer.setNextMediaPlayer(mNextMediaPlayer);
-            } else {
-                if (mNextMediaPlayer != null) {
-                    mNextMediaPlayer.release();
-                    mNextMediaPlayer = null;
-                }
-            }
+            Log.d("Multi","setNextSource"+path);
+           if(remote==null) {
+               mNextMediaPath = null;
+               try {
+                   mCurrentMediaPlayer.setNextMediaPlayer(null);
+               } catch (IllegalArgumentException e) {
+                   Log.i(TAG, "Next media player is current one, continuing");
+               } catch (IllegalStateException e) {
+                   Log.e(TAG, "Media player not initialized!");
+                   return;
+               }
+               if (mNextMediaPlayer != null) {
+                   mNextMediaPlayer.release();
+                   mNextMediaPlayer = null;
+               }
+               if (path == null) {
+                   return;
+               }
+               mNextMediaPlayer = new MediaPlayer();
+               mNextMediaPlayer.setWakeMode(mService.get(), PowerManager.PARTIAL_WAKE_LOCK);
+               mNextMediaPlayer.setAudioSessionId(getAudioSessionId());
+               if (setDataSourceImpl(mNextMediaPlayer, path)) {
+                   mNextMediaPath = path;
+                   mCurrentMediaPlayer.setNextMediaPlayer(mNextMediaPlayer);
+               } else {
+                   if (mNextMediaPlayer != null) {
+                       mNextMediaPlayer.release();
+                       mNextMediaPlayer = null;
+                   }
+               }
+           }else {
+              // if(path!=null)remote.setMedia(path);
+           }
         }
 
 
         public void setHandler(final Handler handler) {
+            Log.d("Multi","setHandler");
             mHandler = handler;
         }
 
 
         public boolean isInitialized() {
-            return mIsInitialized;
+            Log.d("Multi","isinit"+mIsInitialized);
+            if(remote!=null)return true;
+                return mIsInitialized;
         }
 
 
         public void start() {
-            mCurrentMediaPlayer.start();
+            Log.d("Multi","start");
+            if(remote==null) {
+                mCurrentMediaPlayer.start();
+            }else{
+                try {
+                    remote.play();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
 
         public void stop() {
-            mCurrentMediaPlayer.reset();
+            Log.d("Multi","stop");
+            if(remote==null) {
+                mCurrentMediaPlayer.reset();
+            }else{
+                /*try {
+                    remote.stop();
+                } catch (IOException e) {
+                    return;
+                }*/
+            }
             mIsInitialized = false;
         }
 
 
         public void release() {
-            mCurrentMediaPlayer.release();
+            Log.d("Multi","release");
+            if(remote==null) {
+                mCurrentMediaPlayer.release();
+            }else{
+                remote.close();
+            }
         }
 
 
         public void pause() {
-            mCurrentMediaPlayer.pause();
+            Log.d("Multi","pause");
+            if(remote==null) {
+                mCurrentMediaPlayer.pause();
+            }else {
+                try {
+                    remote.pause();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
 
         public long duration() {
-            return mCurrentMediaPlayer.getDuration();
+            Log.d("Multi","duration");
+            if(remote==null) {
+                return mCurrentMediaPlayer.getDuration();
+            }else {
+              //  return mDuration;
+            return mService.get().getDuration();
+            //    return 60;
+            }
         }
 
 
         public long position() {
-            return mCurrentMediaPlayer.getCurrentPosition();
+            Log.d("Multi","position");
+            if(remote==null) {
+                return mCurrentMediaPlayer.getCurrentPosition();
+            }else {
+                return remote.getPosition();
+            }
         }
 
 
         public long seek(final long whereto) {
-            mCurrentMediaPlayer.seekTo((int) whereto);
+            Log.d("Multi","seek");
+            if(remote==null) {
+                mCurrentMediaPlayer.seekTo((int) whereto);
+            }else {
+                try {
+                    remote.seek((int) whereto);
+                } catch (IOException e) {
+
+                }
+            }
             return whereto;
         }
 
 
         public void setVolume(final float vol) {
-            mCurrentMediaPlayer.setVolume(vol, vol);
+            if(remote==null) {
+                mCurrentMediaPlayer.setVolume(vol, vol);
+            }
         }
 
         public int getAudioSessionId() {
-            return mCurrentMediaPlayer.getAudioSessionId();
+
+            if(remote==null) {
+                return mCurrentMediaPlayer.getAudioSessionId();
+            }else {
+                return 0;
+            }
         }
 
         public void setAudioSessionId(final int sessionId) {
