@@ -2397,7 +2397,7 @@ public class MusicService extends Service {
 
 
         public void setNextDataSource(final String path) {
-            Log.d("Multi","setNextSource"+path);
+            Log.d("Multi","setNextSource "+path);
            if(remote==null) {
                mNextMediaPath = null;
                try {

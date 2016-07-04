@@ -9,12 +9,20 @@ import java.io.IOException;
  */
 public interface IRemote {
     void close();
+
     void setMedia(String file);
+
     void play() throws IOException;
+
     void stop() throws IOException;
+
     void pause() throws IOException;
+
     void seek(int sec) throws IOException;
+
     void setEventListener(IRemoteEvent listener);
+
     int getPosition();
+
     Bitmap getImage();
 }

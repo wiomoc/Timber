@@ -8,11 +8,13 @@ public class RemoteObject implements Parcelable {
     public int id;
     public String name;
     public Bitmap image;
-    public RemoteObject(int id, String name, Bitmap image){
+
+    public RemoteObject(int id, String name, Bitmap image) {
         this.id = id;
         this.name = name;
         this.image = image;
     }
+
     protected RemoteObject(Parcel in) {
         id = in.readInt();
         name = in.readString();

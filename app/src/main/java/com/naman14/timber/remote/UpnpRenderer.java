@@ -20,12 +20,15 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.ProtocolException;
 import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
+import java.util.TimeZone;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.xml.parsers.DocumentBuilder;
@@ -39,7 +42,11 @@ public class UpnpRenderer implements IRemote, Runnable {
             while (true) {
                 try {
                     Request request = queue.poll();
-                    if (request != null) sendXMLPost(request.urls, request.content, request.action);
+
+                    if (request != null) {
+                        InputStream in = sendXMLPost(request.urls, request.content, request.action);
+                        if (request.runnable != null) request.runnable.run(in);
+                    }
                     queue.wait();
                 } catch (IOException ignored) {
 
@@ -51,11 +58,15 @@ public class UpnpRenderer implements IRemote, Runnable {
 
     }
 
+    interface RequestRunnable {
+        void run(InputStream in);
+    }
+
     private class Request {
         String urls;
         String content;
         String action;
-        Runnable runnable;
+        RequestRunnable runnable;
     }
 
     String SCPDRC = null;
@@ -201,11 +212,11 @@ public class UpnpRenderer implements IRemote, Runnable {
 
     }
 
-    void getSupportedFormats() {
+    private void getSupportedFormats() {
         try {
             DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
             DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(sendRequest(this.controlCON, "GetProtocolInfo", null, CONNECTIONMANAGER, false, false,null));
+            Document doc = db.parse(sendRequest(this.controlCON, "GetProtocolInfo", null, CONNECTIONMANAGER, false, false, null));
             String res = doc.getElementsByTagName("Sink").item(0).getTextContent();
             if (res == null) return;
             String[] res2 = res.split(",");
@@ -227,7 +238,7 @@ public class UpnpRenderer implements IRemote, Runnable {
         }
     }
 
-    public InputStream sendRequest(String url, String op, String data, String context, boolean sendInstanceID, boolean async,Runnable runnable) throws IOException {
+    private InputStream sendRequest(String url, String op, String data, String context, boolean sendInstanceID, boolean async, RequestRunnable runnable) throws IOException {
         String req = "<?xml version=\"1.0\"?><SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\" SOAP-ENV:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><SOAP-ENV:Body><m:" + op + " xmlns:m=\"" + context + "\"" + ((data == null && (!sendInstanceID)) ? "/" : "") + ">";
         if (sendInstanceID)
             req += "<InstanceID xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"ui4\">" + mInstanceID + "</InstanceID>";
@@ -237,7 +248,7 @@ public class UpnpRenderer implements IRemote, Runnable {
         }
         req += "</SOAP-ENV:Body></SOAP-ENV:Envelope>";
         if (async) {
-            sendXMLPostAsync(url, req, "\"" + context + "#" + op + "\"",runnable);
+            sendXMLPostAsync(url, req, "\"" + context + "#" + op + "\"", runnable);
             return null;
         }
         return sendXMLPost(url, req, "\"" + context + "#" + op + "\"");
@@ -262,7 +273,7 @@ public class UpnpRenderer implements IRemote, Runnable {
         }
     }
 
-    private void sendXMLPostAsync(String urls, String content, String action,Runnable runnable) {
+    private void sendXMLPostAsync(String urls, String content, String action, RequestRunnable runnable) {
         Request request = new Request();
         request.urls = urls;
         request.content = content;
@@ -277,14 +288,51 @@ public class UpnpRenderer implements IRemote, Runnable {
             thread.start();
         }
     }
-    public int getPosition(){
-        positionCounter++;
-        if(positionStart!=-1) {
-            return (int) (positionOffset + (new Date().getTime() - positionStart));
+
+    private void loadPosition() {
+        try {
+            sendRequest(this.controlAVT, "GetPositionInfo", "", AVTRANSPORT, true, true, new RequestRunnable() {
+                @Override
+                public void run(InputStream in) {
+
+                    try {
+                        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                        DocumentBuilder db = dbf.newDocumentBuilder();
+                        Document doc = db.parse(in);
+                        String timestring = doc.getElementsByTagName("RelTime").item(0).getTextContent();
+
+                        if (timestring != null) {
+                            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
+                            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                            positionOffset = (int) (sdf.parse(timestring).getTime());
+                            positionStart = -1;
+                        }
+                        Log.d("POS", positionOffset + "  " + timestring);
+                    } catch (ParserConfigurationException | IOException | SAXException | ParseException e) {
+                    }
+
+
+                }
+            });
+        } catch (IOException e) {
+
         }
+    }
+
+    public int getPosition() {
+        positionCounter++;
+        if (positionCounter == 30) {
+            positionCounter = 0;
+            loadPosition();
+        }
+        if (positionStart != -1) {
+            return  (int) (positionOffset + (new Date().getTime() - positionStart));
+        }
+
         return positionOffset;
     }
-    public static InputStream sendXMLPost(String urls, String content, String action) throws IOException {
+
+    private static InputStream sendXMLPost(String urls, String content, String action) throws IOException {
         URL url = new URL(urls);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setDoInput(true);
@@ -302,6 +350,7 @@ public class UpnpRenderer implements IRemote, Runnable {
     }
 
     public void setMedia(String file) {
+        if(file==null||file.equals(""))return;
         try {
             String ending = file.substring(file.lastIndexOf('.') + 1);
             String info = null;
@@ -312,7 +361,7 @@ public class UpnpRenderer implements IRemote, Runnable {
 
             String audioUrl = "http://" + mIp + ":45840/media/" + mServer.addResource(file, info);
 
-            sendRequest(controlAVT, "SetAVTransportURI", SET_MEDIA0 + audioUrl + SET_MEDIA1 + getMeta(info, audioUrl, null, null, null) + SET_MEDIA2, "urn:schemas-upnp-org:service:AVTransport:1", true, true,null);
+            sendRequest(controlAVT, "SetAVTransportURI", SET_MEDIA0 + audioUrl + SET_MEDIA1 + getMeta(info, audioUrl, null, null, null) + SET_MEDIA2, "urn:schemas-upnp-org:service:AVTransport:1", true, true, null);
 
 
         } catch (IOException e) {
@@ -322,25 +371,27 @@ public class UpnpRenderer implements IRemote, Runnable {
     }
 
     public void play() throws IOException {
-        sendRequest(this.controlAVT, "Play", "<Speed xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">1</Speed>", AVTRANSPORT, true, true,null);
+        sendRequest(this.controlAVT, "Play", "<Speed xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">1</Speed>", AVTRANSPORT, true, true, null);
         positionStart = new Date().getTime();
+        loadPosition();
     }
 
     public void pause() throws IOException {
-        sendRequest(this.controlAVT, "Pause", "", AVTRANSPORT, true, true,null);
-        positionOffset+=new Date().getTime()-positionStart;
-        positionStart=-1;
+        sendRequest(this.controlAVT, "Pause", "", AVTRANSPORT, true, true, null);
+        positionOffset += new Date().getTime() - positionStart;
+        positionStart = -1;
+        loadPosition();
     }
 
     public void stop() throws IOException {
-        sendRequest(this.controlAVT, "Stop", "", AVTRANSPORT, true, true,null);
-        positionOffset+=new Date().getTime()-positionStart;
-        positionStart=-1;
+        sendRequest(this.controlAVT, "Stop", "", AVTRANSPORT, true, true, null);
+        positionOffset += new Date().getTime() - positionStart;
+        positionStart = -1;
     }
 
     public void seek(int secs) throws IOException {
-        sendRequest(this.controlAVT, "Seek", "<Unit xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">REL_TIME</Unit><Target xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">" + secs / 3600 + ":" + secs / 60 + ":" + secs % 60 + "</Target>", AVTRANSPORT, true, true,null);
-        positionOffset+=secs;
+        sendRequest(this.controlAVT, "Seek", "<Unit xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">REL_TIME</Unit><Target xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">" + secs / 3600 + ":" + secs / 60 + ":" + secs % 60 + "</Target>", AVTRANSPORT, true, true, null);
+        positionOffset += secs;
 
     }
 
