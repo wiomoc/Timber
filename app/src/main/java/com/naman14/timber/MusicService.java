@@ -2398,7 +2398,7 @@ public class MusicService extends Service {
                 return true;
             } else {
                 Log.d("Dur", "0");
-                remote.setMedia(mService.get().getPath(), mService.get().getArtistName(), mService.get().getAlbumName(), mService.get().getTrackName());
+                remote.setMedia(mService.get().getPath(), mService.get().getArtistName(), mService.get().getAlbumName(), mService.get().getTrackName(),getRealPathFromURI(TimberUtils.getAlbumArtUri( mService.get().getAlbumId())));
                 //MediaMetadataRetriever metaRetriever = new MediaMetadataRetriever();
                 //metaRetriever.setDataSource(path);;
                 //String duration = metaRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
@@ -2408,7 +2408,16 @@ public class MusicService extends Service {
             }
         }
 
-
+        public String getRealPathFromURI(Uri contentUri) {
+            String[] proj = { MediaStore.Images.Media.DATA };
+            Cursor cursor = mService.get().getContentResolver().query(contentUri, proj,
+                    null, null, null);
+            int column_index = cursor
+                    .getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
+            cursor.moveToFirst();
+            if(cursor.getCount()==0)return null;
+            return cursor.getString(column_index);
+        }
         public void setNextDataSource(final String path) {
             Log.d("Multi", "setNextSource " + path);
             if (remote == null) {

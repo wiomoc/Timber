@@ -10,7 +10,7 @@ import java.io.IOException;
 public interface IRemote {
     void close();
 
-    void setMedia(String file, String artist, String album, String title);
+    void setMedia(String file, String artist, String album, String title,String picture);
 
     void play() throws IOException;
 

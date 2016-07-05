@@ -39,7 +39,9 @@ public class Server extends NanoHTTPD {
     }
 
     String addResource(String path, String info) {
-        String uri = String.valueOf(new Random().nextInt(100000000)) + path.substring(path.lastIndexOf('.'));
+        int last = path.lastIndexOf('.');
+        String uri = String.valueOf(new Random().nextInt(100000000));
+        if (last > path.length() - 7) uri += path.substring(last);
         UriInfo ui = new UriInfo();
         ui.uri = path;
         ui.info = info;
@@ -60,14 +62,19 @@ public class Server extends NanoHTTPD {
             File file = new File(filename);
 
             InputStream in = new FileInputStream(file);
-            String[] meta = ui.info.split(":");
+
             Response res;
             long len = file.length();
-            if (meth == Method.GET) res = new Response(Response.Status.OK, meta[2], in, len);
-            else if (meth == Method.HEAD) res = new Response(Response.Status.OK, meta[2], "");
-            else return null;
+            if (ui.info != null) {
+                String[] meta = ui.info.split(":");
+                if (meth == Method.GET) res = new Response(Response.Status.OK, meta[2], in, len);
+                else if (meth == Method.HEAD) res = new Response(Response.Status.OK, meta[2], "");
+                else return null;
 
-            if (meta.length > 3) res.addHeader("ContentFeatures.DLNA.ORG", meta[3]);
+                if (meta.length > 3) res.addHeader("ContentFeatures.DLNA.ORG", meta[3]);
+            } else {
+                res = new Response(Response.Status.OK, "image/jpeg", in, len);
+            }
             res.addHeader("Content-Range", "bytes 0-" + len + "/" + len);
             res.addHeader("Scid.DLNA.ORG", "134252567");
             res.addHeader("TransferMode.DLNA.ORG", "Streaming");

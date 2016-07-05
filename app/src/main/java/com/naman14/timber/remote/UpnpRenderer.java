@@ -84,7 +84,7 @@ public class UpnpRenderer implements IRemote, Runnable {
                 db = dbf.newDocumentBuilder();
                 Document doc = db.parse(in);
                 vol += Integer.valueOf(doc.getElementsByTagName("CurrentVolume").item(0).getTextContent());
-                sendRequest(UpnpRenderer.this.controlRC, "SetVolume", "<Channel>MASTER</Channel><DesiredVolume>"+vol+"</DesiredVolume>", RENDERINGCONTROL, true, false, null);
+                sendRequest(UpnpRenderer.this.controlRC, "SetVolume", "<Channel>Master</Channel><DesiredVolume>" + vol + "</DesiredVolume>", RENDERINGCONTROL, true, false, null);
 
             } catch (ParserConfigurationException | IOException | SAXException e) {
             }
@@ -377,7 +377,7 @@ public class UpnpRenderer implements IRemote, Runnable {
         return connection.getInputStream();
     }
 
-    public void setMedia(String file, String artist, String album, String title) {
+    public void setMedia(String file, String artist, String album, String title, String cover) {
         if (file == null || file.length() == 0) return;
         try {
             String ending = file.substring(file.lastIndexOf('.') + 1);
@@ -388,8 +388,11 @@ public class UpnpRenderer implements IRemote, Runnable {
             if (mServer == null) (mServer = new Server()).start();
 
             String audioUrl = "http://" + mIp + ":45840/media/" + mServer.addResource(file, info);
-
-            sendRequest(controlAVT, "SetAVTransportURI", SET_MEDIA0 + audioUrl + SET_MEDIA1 + getMeta(info, audioUrl, artist, album, title) + SET_MEDIA2, "urn:schemas-upnp-org:service:AVTransport:1", true, true, null);
+            String coverUrl = "";
+            if (cover != null)
+                coverUrl = "http://" + mIp + ":45840/media/" + mServer.addResource(cover, null);
+            Log.d("URL", coverUrl);
+            sendRequest(controlAVT, "SetAVTransportURI", SET_MEDIA0 + audioUrl + SET_MEDIA1 + getMeta(info, audioUrl, artist, album, title, coverUrl) + SET_MEDIA2, "urn:schemas-upnp-org:service:AVTransport:1", true, true, null);
 
 
         } catch (IOException e) {
@@ -424,16 +427,18 @@ public class UpnpRenderer implements IRemote, Runnable {
 
     @Override
     public void volumeChange(int vol) throws IOException {
-        sendRequest(this.controlRC, "GetVolume", "<Channel>MASTER</Channel>", RENDERINGCONTROL, true, true, new VolumeUpdater(vol));
+        sendRequest(this.controlRC, "GetVolume", "<Channel>Master</Channel>", RENDERINGCONTROL, true, true, new VolumeUpdater(vol));
     }
 
-    private String getMeta(String info, String url, String artist, String album, String title) {
+    private String getMeta(String info, String url, String artist, String album, String title, String cover) {
         String tmp = "&lt;res duration=&quot;0:04:45.246&quot; bitrate=&quot;40000&quot; protocolInfo=&quot;" + info + "&quot; sampleFrequency=&quot;44100&quot; bitsPerSample=&quot;16&quot; nrAudioChannels=&quot;2&quot;&gt;" + url + "&lt;/res&gt;";
         String x = META0 + tmp;
         if (title != null) x += (META_TITLE0 + title + META_TITLE1);
         if (album != null) x += (META_ALBUM0 + album + META_ALBUM1);
         if (artist != null)
             x += (META_ARTIST0 + artist + META_ARTIST1 + artist + META_ARTIST2 + artist + META_ARTIST3);
+        if(cover!=null)
+            x+="&lt;upnp:albumArtURI&gt;"+cover+"&lt;/upnp:albumArtURI&gt;";
         x += META1;
         return x;
     }
