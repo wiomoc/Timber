@@ -94,7 +94,7 @@ public class UpnpRenderer implements IRemote, Runnable {
     final static String SET_MEDIA0 = "<CurrentURI xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">";
     final static String SET_MEDIA1 = "</CurrentURI><CurrentURIMetaData ";
     final static String SET_MEDIA2 = "</CurrentURIMetaData>";
-    final static String META0 = "xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">&lt;DIDL-Lite xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:microsoft=\"urn:schemas-microsoft-com:WMPNSS-1-0/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\"&gt;";
+    final static String META0 = "xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;DIDL-Lite xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:microsoft=\"urn:schemas-microsoft-com:WMPNSS-1-0/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\"&gt;&lt;item&gt;";
     final static String META_TITLE0 = "&lt;dc:title&gt;";
     final static String META_TITLE1 = "&lt;/dc:title&gt;";
     final static String META_ARTIST0 = "&lt;dc:creator&gt;";
@@ -230,6 +230,9 @@ public class UpnpRenderer implements IRemote, Runnable {
                         mSuppFormats.put("wma", res3);
                     } else if (res3.contains("wav")) {
                         mSuppFormats.put("wav", res3);
+                    }else if (res3.contains("m4a")||res3.contains("mp4")) {
+                        mSuppFormats.put("mp4", res3);
+                        mSuppFormats.put("m4a", res3);
                     }
                 }
             }
@@ -326,7 +329,7 @@ public class UpnpRenderer implements IRemote, Runnable {
             loadPosition();
         }
         if (positionStart != -1) {
-            return  (int) (positionOffset + (new Date().getTime() - positionStart));
+            return (int) (positionOffset + (new Date().getTime() - positionStart));
         }
 
         return positionOffset;
@@ -349,8 +352,8 @@ public class UpnpRenderer implements IRemote, Runnable {
         return connection.getInputStream();
     }
 
-    public void setMedia(String file) {
-        if(file==null||file.equals(""))return;
+    public void setMedia(String file, String artist, String album, String title) {
+        if (file == null || file.equals("")) return;
         try {
             String ending = file.substring(file.lastIndexOf('.') + 1);
             String info = null;
@@ -361,7 +364,7 @@ public class UpnpRenderer implements IRemote, Runnable {
 
             String audioUrl = "http://" + mIp + ":45840/media/" + mServer.addResource(file, info);
 
-            sendRequest(controlAVT, "SetAVTransportURI", SET_MEDIA0 + audioUrl + SET_MEDIA1 + getMeta(info, audioUrl, null, null, null) + SET_MEDIA2, "urn:schemas-upnp-org:service:AVTransport:1", true, true, null);
+            sendRequest(controlAVT, "SetAVTransportURI", SET_MEDIA0 + audioUrl + SET_MEDIA1 + getMeta(info, audioUrl, artist, album, title) + SET_MEDIA2, "urn:schemas-upnp-org:service:AVTransport:1", true, true, null);
 
 
         } catch (IOException e) {

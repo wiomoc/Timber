@@ -69,6 +69,7 @@ import com.naman14.timber.provider.MusicPlaybackState;
 import com.naman14.timber.provider.RecentStore;
 import com.naman14.timber.provider.SongPlayCount;
 import com.naman14.timber.remote.IRemote;
+import com.naman14.timber.remote.IRemoteEvent;
 import com.naman14.timber.remote.RemoteObject;
 import com.naman14.timber.remote.UpnpRenderer;
 import com.naman14.timber.remote.UpnpRendererScanner;
@@ -148,7 +149,7 @@ public class MusicService extends Service {
             "audio._id AS _id", MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.ARTIST_ID,MediaStore.Audio.Media.DURATION
+            MediaStore.Audio.Media.ARTIST_ID, MediaStore.Audio.Media.DURATION
     };
     private static final String[] ALBUM_PROJECTION = new String[]{
             MediaStore.Audio.Albums.ALBUM, MediaStore.Audio.Albums.ARTIST,
@@ -182,7 +183,7 @@ public class MusicService extends Service {
     private AudioManager mAudioManager;
     private SharedPreferences mPreferences;
     private boolean mServiceInUse = false;
-    private boolean mIsSupposedToBePlaying = false;
+    boolean mIsSupposedToBePlaying = false;
     private long mLastPlayedTime;
     private int mNotifyMode = NOTIFY_MODE_NONE;
     private long mNotificationPostTime = 0;
@@ -539,7 +540,7 @@ public class MusicService extends Service {
             } else {
 
                 IRemote rend = remoteObjects.get(id - 1);
-                if (mPlayer.remote!=rend) {
+                if (mPlayer.remote != rend) {
                     Intent intentChange = new Intent(RemoteSelectDialog.REMOTE_STATE_CHANGE);
                     intentChange.putExtra(RemoteSelectDialog.REMOTE_ID, id);
                     intentChange.putExtra(RemoteSelectDialog.REMOTE_STATE, RemoteSelectDialog.REMOTE_CONNECTED);
@@ -1690,14 +1691,15 @@ public class MusicService extends Service {
 
         return -1;
     }
-    public int getDuration(){
+
+    public int getDuration() {
         synchronized (this) {
             if (mCursor == null) {
                 return -1;
             }
             try {
                 return mCursor.getInt(mCursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DURATION));
-            } catch (IllegalArgumentException e){
+            } catch (IllegalArgumentException e) {
                 return -1;
             }
 
@@ -2338,29 +2340,38 @@ public class MusicService extends Service {
 
 
         public void setDataSource(final String path) {
-            Log.d("Multi","setSource"+path);
+            Log.d("Multi", "setSource" + path);
             mIsInitialized = setDataSourceImpl(mCurrentMediaPlayer, path);
             if (mIsInitialized) {
                 setNextDataSource(null);
             }
-           // mDuration=-1;
+            // mDuration=-1;
         }
 
-        public void setRemote(IRemote remote){
-            Log.d("Multi","setRemote");
+        public void setRemote(IRemote remote) {
+            Log.d("Multi", "setRemote");
             int position = (int) position();
             this.stop();
             this.release();
             mIsInitialized = true;
+            if (remote != null) remote.setEventListener(new IRemoteEvent() {
+                @Override
+                public void onStateChange(RemoteState state) {
+                    mService.get().mIsSupposedToBePlaying = state == RemoteState.PLAYING;
+                    mService.get().notifyChange(PLAYSTATE_CHANGED);
+                }
+            });
             this.remote = remote;
             setDataSource(mService.get().getPath());
-            if(position!=-1)this.seek(position);
+            if (position != -1) this.seek(position);
 
         }
+
         private boolean setDataSourceImpl(final MediaPlayer player, final String path) {
-            Log.d("Multi","setSourceImpl"+path);
-            if(remote==null) {
+            Log.d("Multi", "setSourceImpl" + path);
+            if (remote == null) {
                 try {
+
                     player.reset();
                     player.setOnPreparedListener(null);
                     if (path.startsWith("content://")) {
@@ -2381,76 +2392,74 @@ public class MusicService extends Service {
                 player.setOnCompletionListener(this);
                 player.setOnErrorListener(this);
                 return true;
-            }else{
-                Log.d("Dur","0");
-                remote.setMedia(mService.get().getPath());
+            } else {
+                Log.d("Dur", "0");
+                remote.setMedia(mService.get().getPath(), mService.get().getArtistName(), mService.get().getAlbumName(), mService.get().getTrackName());
                 //MediaMetadataRetriever metaRetriever = new MediaMetadataRetriever();
-                Log.d("Dur","1");
-                //metaRetriever.setDataSource(path);
-                Log.d("Dur","2");
+                //metaRetriever.setDataSource(path);;
                 //String duration = metaRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
                 //Log.d("Dur",duration);
-               // mDuration = Integer.parseInt(duration);
+                // mDuration = Integer.parseInt(duration);
                 return true;
             }
         }
 
 
         public void setNextDataSource(final String path) {
-            Log.d("Multi","setNextSource "+path);
-           if(remote==null) {
-               mNextMediaPath = null;
-               try {
-                   mCurrentMediaPlayer.setNextMediaPlayer(null);
-               } catch (IllegalArgumentException e) {
-                   Log.i(TAG, "Next media player is current one, continuing");
-               } catch (IllegalStateException e) {
-                   Log.e(TAG, "Media player not initialized!");
-                   return;
-               }
-               if (mNextMediaPlayer != null) {
-                   mNextMediaPlayer.release();
-                   mNextMediaPlayer = null;
-               }
-               if (path == null) {
-                   return;
-               }
-               mNextMediaPlayer = new MediaPlayer();
-               mNextMediaPlayer.setWakeMode(mService.get(), PowerManager.PARTIAL_WAKE_LOCK);
-               mNextMediaPlayer.setAudioSessionId(getAudioSessionId());
-               if (setDataSourceImpl(mNextMediaPlayer, path)) {
-                   mNextMediaPath = path;
-                   mCurrentMediaPlayer.setNextMediaPlayer(mNextMediaPlayer);
-               } else {
-                   if (mNextMediaPlayer != null) {
-                       mNextMediaPlayer.release();
-                       mNextMediaPlayer = null;
-                   }
-               }
-           }else {
-              // if(path!=null)remote.setMedia(path);
-           }
+            Log.d("Multi", "setNextSource " + path);
+            if (remote == null) {
+                mNextMediaPath = null;
+                try {
+                    mCurrentMediaPlayer.setNextMediaPlayer(null);
+                } catch (IllegalArgumentException e) {
+                    Log.i(TAG, "Next media player is current one, continuing");
+                } catch (IllegalStateException e) {
+                    Log.e(TAG, "Media player not initialized!");
+                    return;
+                }
+                if (mNextMediaPlayer != null) {
+                    mNextMediaPlayer.release();
+                    mNextMediaPlayer = null;
+                }
+                if (path == null) {
+                    return;
+                }
+                mNextMediaPlayer = new MediaPlayer();
+                mNextMediaPlayer.setWakeMode(mService.get(), PowerManager.PARTIAL_WAKE_LOCK);
+                mNextMediaPlayer.setAudioSessionId(getAudioSessionId());
+                if (setDataSourceImpl(mNextMediaPlayer, path)) {
+                    mNextMediaPath = path;
+                    mCurrentMediaPlayer.setNextMediaPlayer(mNextMediaPlayer);
+                } else {
+                    if (mNextMediaPlayer != null) {
+                        mNextMediaPlayer.release();
+                        mNextMediaPlayer = null;
+                    }
+                }
+            } else {
+                // if(path!=null)remote.setMedia(path);
+            }
         }
 
 
         public void setHandler(final Handler handler) {
-            Log.d("Multi","setHandler");
+            Log.d("Multi", "setHandler");
             mHandler = handler;
         }
 
 
         public boolean isInitialized() {
-            Log.d("Multi","isinit"+mIsInitialized);
-            if(remote!=null)return true;
-                return mIsInitialized;
+            //Log.d("Multi", "isinit " + mIsInitialized);
+            if (remote != null) return true;
+            return mIsInitialized;
         }
 
 
         public void start() {
-            Log.d("Multi","start");
-            if(remote==null) {
+            Log.d("Multi", "start");
+            if (remote == null) {
                 mCurrentMediaPlayer.start();
-            }else{
+            } else {
                 try {
                     remote.play();
                 } catch (IOException e) {
@@ -2461,10 +2470,10 @@ public class MusicService extends Service {
 
 
         public void stop() {
-            Log.d("Multi","stop");
-            if(remote==null) {
+            Log.d("Multi", "stop");
+            if (remote == null) {
                 mCurrentMediaPlayer.reset();
-            }else{
+            } else {
                 /*try {
                     remote.stop();
                 } catch (IOException e) {
@@ -2476,20 +2485,20 @@ public class MusicService extends Service {
 
 
         public void release() {
-            Log.d("Multi","release");
-            if(remote==null) {
+            Log.d("Multi", "release");
+            if (remote == null) {
                 mCurrentMediaPlayer.release();
-            }else{
+            } else {
                 remote.close();
             }
         }
 
 
         public void pause() {
-            Log.d("Multi","pause");
-            if(remote==null) {
+            Log.d("Multi", "pause");
+            if (remote == null) {
                 mCurrentMediaPlayer.pause();
-            }else {
+            } else {
                 try {
                     remote.pause();
                 } catch (IOException e) {
@@ -2500,32 +2509,32 @@ public class MusicService extends Service {
 
 
         public long duration() {
-            Log.d("Multi","duration");
-            if(remote==null) {
+            Log.d("Multi", "duration");
+            if (remote == null) {
                 return mCurrentMediaPlayer.getDuration();
-            }else {
-              //  return mDuration;
-            return mService.get().getDuration();
-            //    return 60;
+            } else {
+                //  return mDuration;
+                return mService.get().getDuration();
+                //    return 60;
             }
         }
 
 
         public long position() {
-            Log.d("Multi","position");
-            if(remote==null) {
+            //Log.d("Multi", "position");
+            if (remote == null) {
                 return mCurrentMediaPlayer.getCurrentPosition();
-            }else {
+            } else {
                 return remote.getPosition();
             }
         }
 
 
         public long seek(final long whereto) {
-            Log.d("Multi","seek");
-            if(remote==null) {
+            Log.d("Multi", "seek");
+            if (remote == null) {
                 mCurrentMediaPlayer.seekTo((int) whereto);
-            }else {
+            } else {
                 try {
                     remote.seek((int) whereto);
                 } catch (IOException e) {
@@ -2537,16 +2546,17 @@ public class MusicService extends Service {
 
 
         public void setVolume(final float vol) {
-            if(remote==null) {
+            Log.d("Multi", "VOL. " + vol);
+            if (remote == null) {
                 mCurrentMediaPlayer.setVolume(vol, vol);
             }
         }
 
         public int getAudioSessionId() {
 
-            if(remote==null) {
+            if (remote == null) {
                 return mCurrentMediaPlayer.getAudioSessionId();
-            }else {
+            } else {
                 return 0;
             }
         }

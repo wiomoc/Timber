@@ -39,7 +39,7 @@ public class Server extends NanoHTTPD {
     }
 
     String addResource(String path, String info) {
-        String uri = String.valueOf(new Random().nextInt(1000000)) + path.substring(path.lastIndexOf('/') + 1);
+        String uri = String.valueOf(new Random().nextInt(100000000)) + path.substring(path.lastIndexOf('.'));
         UriInfo ui = new UriInfo();
         ui.uri = path;
         ui.info = info;
