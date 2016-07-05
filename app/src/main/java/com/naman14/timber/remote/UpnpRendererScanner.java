@@ -11,7 +11,7 @@ import java.util.ArrayList;
 
 public class UpnpRendererScanner {
     private Thread mWorkerThread;
-    ScannerResult mCallback;
+    IRemoteScanFound mCallback;
     MulticastSocket mSocket;
 
     final static String SERVICE_NAME = "urn:schemas-upnp-org:device:MediaRenderer:1";
@@ -77,11 +77,7 @@ public class UpnpRendererScanner {
 
     }
 
-    public interface ScannerResult {
-        void onRenderFound(UpnpRenderer rend);
-    }
-
-    public void startScan(ScannerResult callback) {
+    public void startScan(IRemoteScanFound callback) {
         this.mCallback = callback;
         if (mWorkerThread != null) return;
         mWorkerThread = new Thread(new ScannerWorker());

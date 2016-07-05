@@ -68,10 +68,11 @@ import com.naman14.timber.permissions.Nammu;
 import com.naman14.timber.provider.MusicPlaybackState;
 import com.naman14.timber.provider.RecentStore;
 import com.naman14.timber.provider.SongPlayCount;
+import com.naman14.timber.remote.ChromeCastScanner;
 import com.naman14.timber.remote.IRemote;
 import com.naman14.timber.remote.IRemoteEvent;
+import com.naman14.timber.remote.IRemoteScanFound;
 import com.naman14.timber.remote.RemoteObject;
-import com.naman14.timber.remote.UpnpRenderer;
 import com.naman14.timber.remote.UpnpRendererScanner;
 import com.naman14.timber.utils.NavigationUtils;
 import com.naman14.timber.utils.PreferencesUtility;
@@ -241,6 +242,8 @@ public class MusicService extends Service {
         }
     };
     private ContentObserver mMediaStoreObserver;
+    private IRemoteScanFound mRemoteScanFound;
+    private ChromeCastScanner chromeCastScanner;
 
     @Override
     public IBinder onBind(final Intent intent) {
@@ -517,24 +520,34 @@ public class MusicService extends Service {
         } else if (SHUFFLE_ACTION.equals(action)) {
             cycleShuffle();
         } else if (RemoteSelectDialog.REMOTE_START_SCAN.equals(action)) {
-            if (upnpRendererScanner == null) upnpRendererScanner = new UpnpRendererScanner();
-            upnpRendererScanner.startScan(new UpnpRendererScanner.ScannerResult() {
-                @Override
-                public void onRenderFound(final UpnpRenderer rend) {
-                    Log.d("Found", rend.getName());
-                    remoteObjects.add(rend);
-                    Intent intent = new Intent(RemoteSelectDialog.REMOTE_FOUND);
-                    intent.putExtra("Remote", new RemoteObject(remoteObjects.size(), rend.getName(), rend.getImage()));
+            if (mRemoteScanFound == null) {
+                mRemoteScanFound = new IRemoteScanFound() {
+                    @Override
+                    public void onRenderFound(final IRemote rend) {
+                        Log.d("Found", rend.getName());
+                        remoteObjects.add(rend);
+                        Intent intent = new Intent(RemoteSelectDialog.REMOTE_FOUND);
+                        intent.putExtra("Remote", new RemoteObject(remoteObjects.size(), rend.getName(), rend.getImage(), rend.getType()));
 
-                    sendBroadcast(intent);
-                }
-            });
+                        sendBroadcast(intent);
+                    }
+                };
+            }
+            if (upnpRendererScanner == null) upnpRendererScanner = new UpnpRendererScanner();
+            upnpRendererScanner.startScan(mRemoteScanFound);
+
+            if (chromeCastScanner == null) chromeCastScanner = new ChromeCastScanner(this);
+            chromeCastScanner.startScan(mRemoteScanFound);
+
+
         } else if (RemoteSelectDialog.REMOTE_STOP_SCAN.equals(action)) {
 
             if (upnpRendererScanner != null) upnpRendererScanner.stopScan();
+            if (chromeCastScanner != null) chromeCastScanner.stopScan();
         } else if (RemoteSelectDialog.REMOTE_CONNECT.equals(action)) {
             int id = intent.getIntExtra(RemoteSelectDialog.REMOTE_ID, 0);
             if (upnpRendererScanner != null) upnpRendererScanner.stopScan();
+            if (chromeCastScanner != null) chromeCastScanner.stopScan();
             if (id == 0) {
                 mPlayer.setRemote(null);
             } else {
@@ -2358,13 +2371,16 @@ public class MusicService extends Service {
             this.stop();
             this.release();
             mIsInitialized = true;
-            if (remote != null) remote.setEventListener(new IRemoteEvent() {
-                @Override
-                public void onStateChange(RemoteState state) {
-                    mService.get().mIsSupposedToBePlaying = state == RemoteState.PLAYING;
-                    mService.get().notifyChange(PLAYSTATE_CHANGED);
-                }
-            });
+            if (remote != null) {
+                remote.connect();
+                remote.setEventListener(new IRemoteEvent() {
+                    @Override
+                    public void onStateChange(RemoteState state) {
+                        mService.get().mIsSupposedToBePlaying = state == RemoteState.PLAYING;
+                        mService.get().notifyChange(PLAYSTATE_CHANGED);
+                    }
+                });
+            }
             this.remote = remote;
             setDataSource(mService.get().getPath());
             if (position != -1) this.seek(position);
@@ -2398,7 +2414,7 @@ public class MusicService extends Service {
                 return true;
             } else {
                 Log.d("Dur", "0");
-                remote.setMedia(mService.get().getPath(), mService.get().getArtistName(), mService.get().getAlbumName(), mService.get().getTrackName(),getRealPathFromURI(TimberUtils.getAlbumArtUri( mService.get().getAlbumId())));
+                remote.setMedia(mService.get().getPath(), mService.get().getArtistName(), mService.get().getAlbumName(), mService.get().getTrackName(), getRealPathFromURI(TimberUtils.getAlbumArtUri(mService.get().getAlbumId())));
                 //MediaMetadataRetriever metaRetriever = new MediaMetadataRetriever();
                 //metaRetriever.setDataSource(path);;
                 //String duration = metaRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
@@ -2409,15 +2425,21 @@ public class MusicService extends Service {
         }
 
         public String getRealPathFromURI(Uri contentUri) {
-            String[] proj = { MediaStore.Images.Media.DATA };
-            Cursor cursor = mService.get().getContentResolver().query(contentUri, proj,
-                    null, null, null);
-            int column_index = cursor
-                    .getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
-            cursor.moveToFirst();
-            if(cursor.getCount()==0)return null;
-            return cursor.getString(column_index);
+            try {
+                String[] proj = {MediaStore.Images.Media.DATA};
+                Cursor cursor = mService.get().getContentResolver().query(contentUri, proj,
+                        null, null, null);
+                int column_index = cursor
+                        .getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
+                cursor.moveToFirst();
+                if (cursor.getCount() == 0) return null;
+                return cursor.getString(column_index);
+            }catch (Exception e){
+                return null;
+            }
+
         }
+
         public void setNextDataSource(final String path) {
             Log.d("Multi", "setNextSource " + path);
             if (remote == null) {

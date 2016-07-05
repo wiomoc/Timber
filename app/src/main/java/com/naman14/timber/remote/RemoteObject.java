@@ -8,17 +8,20 @@ public class RemoteObject implements Parcelable {
     public int id;
     public String name;
     public Bitmap image;
+    public IRemote.Type type;
 
-    public RemoteObject(int id, String name, Bitmap image) {
+    public RemoteObject(int id, String name, Bitmap image, IRemote.Type type) {
         this.id = id;
         this.name = name;
         this.image = image;
+        this.type = type;
     }
 
     protected RemoteObject(Parcel in) {
         id = in.readInt();
         name = in.readString();
         image = in.readParcelable(Bitmap.class.getClassLoader());
+        type = IRemote.Type.values()[in.readInt()];
     }
 
     @Override
@@ -26,6 +29,7 @@ public class RemoteObject implements Parcelable {
         dest.writeInt(id);
         dest.writeString(name);
         dest.writeParcelable(image, flags);
+        dest.writeInt(type.ordinal());
     }
 
     @Override

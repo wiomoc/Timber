@@ -12,7 +12,11 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.nio.charset.Charset;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Random;
 
@@ -22,6 +26,9 @@ import fi.iki.elonen.NanoHTTPD;
  * Created by Christoph on 21.01.2016.
  */
 public class Server extends NanoHTTPD {
+    private static Server server;
+    final String ip;
+
     private class UriInfo {
         String uri;
         String info;
@@ -34,8 +41,42 @@ public class Server extends NanoHTTPD {
 
     Method meth;
 
-    public Server() {
+    public static Server getServer() {
+        if (server == null) try {
+            (server = new Server()).start();
+        } catch (IOException e) {
+        }
+        return server;
+    }
+
+    private Server() {
         super(45840);
+        this.ip = getDeviceIP();
+
+    }
+
+    private static String getDeviceIP() {
+
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface
+                    .getNetworkInterfaces(); en.hasMoreElements(); ) {
+
+                NetworkInterface intf = en.nextElement();
+
+                for (Enumeration<InetAddress> enumIpAddr = intf
+                        .getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
+
+                    InetAddress inetAdress = enumIpAddr.nextElement();
+                    if (!inetAdress.isLoopbackAddress() && inetAdress instanceof Inet4Address) {
+
+                        return inetAdress.getHostAddress().toString();
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return null;
     }
 
     String addResource(String path, String info) {
@@ -46,7 +87,7 @@ public class Server extends NanoHTTPD {
         ui.uri = path;
         ui.info = info;
         resou.put(uri, ui);
-        return uri;
+        return "http://" + ip + ":45840/media/"+uri;
     }
 
     public void setEventListener(IRemoteEvent eventCallback) {
@@ -109,10 +150,8 @@ public class Server extends NanoHTTPD {
                         if (change) {
                             session.getInputStream().close();
                             parseEvent(myParser.getText());
-
                             return;
                         }
-
                         break;
                 }
                 event = myParser.next();

@@ -24,6 +24,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.naman14.timber.R;
+import com.naman14.timber.remote.IRemote;
 import com.naman14.timber.remote.RemoteObject;
 import com.naman14.timber.utils.TimberUtils;
 
@@ -52,7 +53,7 @@ public class RemoteSelectDialog extends DialogFragment {
         Activity activity = getActivity();
         activity.sendBroadcast(new Intent(REMOTE_START_SCAN));
         adapter = new RemoteAdapter(activity);
-        adapter.add(new RemoteObject(0, "Local", BitmapFactory.decodeResource(activity.getResources(),R.mipmap.ic_launcher)));
+        adapter.add(new RemoteObject(0, "Local", BitmapFactory.decodeResource(activity.getResources(),R.mipmap.ic_launcher), IRemote.Type.LOCAL));
         broadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {

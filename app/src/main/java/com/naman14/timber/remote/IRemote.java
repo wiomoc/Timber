@@ -8,9 +8,16 @@ import java.io.IOException;
  * Created by Christoph on 28.03.2016.
  */
 public interface IRemote {
+
+    public enum Type {
+        LOCAL, UPNP, CHROMECAST;
+    }
+
+    void connect();
+
     void close();
 
-    void setMedia(String file, String artist, String album, String title,String picture);
+    void setMedia(String file, String artist, String album, String title, String picture);
 
     void play() throws IOException;
 
@@ -27,4 +34,8 @@ public interface IRemote {
     int getPosition();
 
     Bitmap getImage();
+
+    String getName();
+
+    Type getType();
 }

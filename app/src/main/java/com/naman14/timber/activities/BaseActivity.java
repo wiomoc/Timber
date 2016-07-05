@@ -27,6 +27,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentManager;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -41,6 +42,9 @@ import com.naman14.timber.MusicService;
 import com.naman14.timber.R;
 import com.naman14.timber.dialogs.RemoteSelectDialog;
 import com.naman14.timber.listeners.MusicStateListener;
+import com.naman14.timber.remote.ChromeCastScanner;
+import com.naman14.timber.remote.IRemote;
+import com.naman14.timber.remote.IRemoteScanFound;
 import com.naman14.timber.slidinguppanel.SlidingUpPanelLayout;
 import com.naman14.timber.subfragments.QuickControlsFragment;
 import com.naman14.timber.utils.Helpers;
@@ -57,6 +61,7 @@ public class BaseActivity extends ATEActivity implements ServiceConnection, Musi
     private final ArrayList<MusicStateListener> mMusicStateListener = new ArrayList<>();
     private MusicPlayer.ServiceToken mToken;
     private PlaybackStatus mPlaybackStatus;
+    public static BaseActivity context;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -85,7 +90,6 @@ public class BaseActivity extends ATEActivity implements ServiceConnection, Musi
         filter.addAction(MusicService.TRACK_ERROR);
 
         registerReceiver(mPlaybackStatus, filter);
-
     }
 
     @Override

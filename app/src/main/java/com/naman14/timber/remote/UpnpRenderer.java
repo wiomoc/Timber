@@ -1,6 +1,5 @@
 package com.naman14.timber.remote;
 
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Log;
@@ -15,15 +14,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.net.ProtocolException;
 import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -106,8 +101,6 @@ public class UpnpRenderer implements IRemote, Runnable {
     int positionOffset = 0;
     long positionStart = 0;
     private Thread thread;
-    private Context mContext;
-    private String mIp;
     private static Server mServer = null;
     private String mInstanceID = "0";
     private String mName;
@@ -185,7 +178,6 @@ public class UpnpRenderer implements IRemote, Runnable {
         } catch (IOException | ParserConfigurationException | SAXException e) {
             throw new RemoteException();
         }
-        mIp = getDeviceIP();
 
         getSupportedFormats();
         registerEvent(eventAVT, false);
@@ -196,12 +188,13 @@ public class UpnpRenderer implements IRemote, Runnable {
     }
 
     public void setEventListener(IRemoteEvent event) {
-        if (mServer == null) try {
-            (mServer = new Server()).start();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        mServer = Server.getServer();
         mServer.setEventListener(event);
+
+    }
+
+    @Override
+    public void connect() {
 
     }
 
@@ -217,7 +210,7 @@ public class UpnpRenderer implements IRemote, Runnable {
         try {
             URL url = new URL(urlstr);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            if (mServer == null) (mServer = new Server()).start();
+            mServer = Server.getServer();
             connection.setDoInput(true);
             //connection.setDoOutput(true);
             connection.setUseCaches(false);
@@ -227,7 +220,7 @@ public class UpnpRenderer implements IRemote, Runnable {
             connection.setRequestProperty("NT", "upnp:event");
             connection.setRequestProperty("Timeout", "Second-86400");
             if (!unregister)
-                connection.setRequestProperty("Callback", "<http://" + mIp + ":45840/event/123>");
+                connection.setRequestProperty("Callback", "<http://" + mServer.ip + ":45840/event/123>");
 
             connection.getInputStream();
 
@@ -385,12 +378,12 @@ public class UpnpRenderer implements IRemote, Runnable {
             if (mSuppFormats != null) {
                 info = mSuppFormats.get(ending);
             }
-            if (mServer == null) (mServer = new Server()).start();
+            mServer = Server.getServer();
 
-            String audioUrl = "http://" + mIp + ":45840/media/" + mServer.addResource(file, info);
+            String audioUrl = mServer.addResource(file, info);
             String coverUrl = "";
             if (cover != null)
-                coverUrl = "http://" + mIp + ":45840/media/" + mServer.addResource(cover, null);
+                coverUrl = mServer.addResource(cover, null);
             Log.d("URL", coverUrl);
             sendRequest(controlAVT, "SetAVTransportURI", SET_MEDIA0 + audioUrl + SET_MEDIA1 + getMeta(info, audioUrl, artist, album, title, coverUrl) + SET_MEDIA2, "urn:schemas-upnp-org:service:AVTransport:1", true, true, null);
 
@@ -437,38 +430,20 @@ public class UpnpRenderer implements IRemote, Runnable {
         if (album != null) x += (META_ALBUM0 + album + META_ALBUM1);
         if (artist != null)
             x += (META_ARTIST0 + artist + META_ARTIST1 + artist + META_ARTIST2 + artist + META_ARTIST3);
-        if(cover!=null)
-            x+="&lt;upnp:albumArtURI&gt;"+cover+"&lt;/upnp:albumArtURI&gt;";
+        if (cover != null)
+            x += "&lt;upnp:albumArtURI&gt;" + cover + "&lt;/upnp:albumArtURI&gt;";
         x += META1;
         return x;
     }
 
-    private static String getDeviceIP() {
-
-        try {
-            for (Enumeration<NetworkInterface> en = NetworkInterface
-                    .getNetworkInterfaces(); en.hasMoreElements(); ) {
-
-                NetworkInterface intf = en.nextElement();
-
-                for (Enumeration<InetAddress> enumIpAddr = intf
-                        .getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
-
-                    InetAddress inetAdress = enumIpAddr.nextElement();
-                    if (!inetAdress.isLoopbackAddress() && inetAdress instanceof Inet4Address) {
-
-                        return inetAdress.getHostAddress().toString();
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-        return null;
-    }
 
     public String getName() {
         return this.mName;
+    }
+
+    @Override
+    public Type getType() {
+        return Type.UPNP;
     }
 
     static void setMethod(HttpURLConnection httpURLConnection, String method) {
