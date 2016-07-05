@@ -10,7 +10,7 @@ import java.io.IOException;
 public interface IRemote {
     void close();
 
-    void setMedia(String file,String artist,String album,String title);
+    void setMedia(String file, String artist, String album, String title);
 
     void play() throws IOException;
 
@@ -19,6 +19,8 @@ public interface IRemote {
     void pause() throws IOException;
 
     void seek(int sec) throws IOException;
+
+    void volumeChange(int vol) throws IOException;
 
     void setEventListener(IRemoteEvent listener);
 

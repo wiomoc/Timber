@@ -69,6 +69,30 @@ public class UpnpRenderer implements IRemote, Runnable {
         RequestRunnable runnable;
     }
 
+    private class VolumeUpdater implements RequestRunnable {
+        int vol;
+
+        VolumeUpdater(int vol) {
+            this.vol = vol;
+        }
+
+        @Override
+        public void run(InputStream in) {
+            try {
+                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                DocumentBuilder db = null;
+                db = dbf.newDocumentBuilder();
+                Document doc = db.parse(in);
+                vol += Integer.valueOf(doc.getElementsByTagName("CurrentVolume").item(0).getTextContent());
+                sendRequest(UpnpRenderer.this.controlRC, "SetVolume", "<Channel>MASTER</Channel><DesiredVolume>"+vol+"</DesiredVolume>", RENDERINGCONTROL, true, false, null);
+
+            } catch (ParserConfigurationException | IOException | SAXException e) {
+            }
+
+
+        }
+    }
+
     String SCPDRC = null;
     String controlRC = null;
     String eventRC = null;
@@ -78,7 +102,7 @@ public class UpnpRenderer implements IRemote, Runnable {
     String SCPDCON = null;
     String controlCON = null;
     private Queue<Request> queue = new LinkedList<>();
-    int positionCounter = 0;
+    long positionLast = 0;
     int positionOffset = 0;
     long positionStart = 0;
     private Thread thread;
@@ -91,6 +115,7 @@ public class UpnpRenderer implements IRemote, Runnable {
     private HashMap<String, String> mSuppFormats = null;
     final static String AVTRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1";
     final static String CONNECTIONMANAGER = "urn:schemas-upnp-org:service:ConnectionManager:1";
+    final static String RENDERINGCONTROL = "urn:schemas-upnp-org:service:RenderingControl:1";
     final static String SET_MEDIA0 = "<CurrentURI xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">";
     final static String SET_MEDIA1 = "</CurrentURI><CurrentURIMetaData ";
     final static String SET_MEDIA2 = "</CurrentURIMetaData>";
@@ -230,7 +255,7 @@ public class UpnpRenderer implements IRemote, Runnable {
                         mSuppFormats.put("wma", res3);
                     } else if (res3.contains("wav")) {
                         mSuppFormats.put("wav", res3);
-                    }else if (res3.contains("m4a")||res3.contains("mp4")) {
+                    } else if (res3.contains("m4a") || res3.contains("mp4")) {
                         mSuppFormats.put("mp4", res3);
                         mSuppFormats.put("m4a", res3);
                     }
@@ -323,13 +348,13 @@ public class UpnpRenderer implements IRemote, Runnable {
     }
 
     public int getPosition() {
-        positionCounter++;
-        if (positionCounter == 30) {
-            positionCounter = 0;
+        long time = new Date().getTime();
+        if (time > positionLast + 1000) {
+            positionLast = time;
             loadPosition();
         }
         if (positionStart != -1) {
-            return (int) (positionOffset + (new Date().getTime() - positionStart));
+            return (int) (positionOffset + (time - positionStart));
         }
 
         return positionOffset;
@@ -353,7 +378,7 @@ public class UpnpRenderer implements IRemote, Runnable {
     }
 
     public void setMedia(String file, String artist, String album, String title) {
-        if (file == null || file.equals("")) return;
+        if (file == null || file.length() == 0) return;
         try {
             String ending = file.substring(file.lastIndexOf('.') + 1);
             String info = null;
@@ -395,7 +420,11 @@ public class UpnpRenderer implements IRemote, Runnable {
     public void seek(int secs) throws IOException {
         sendRequest(this.controlAVT, "Seek", "<Unit xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">REL_TIME</Unit><Target xmlns:dt=\"urn:schemas-microsoft-com:datatypes\" dt:dt=\"string\">" + secs / 3600 + ":" + secs / 60 + ":" + secs % 60 + "</Target>", AVTRANSPORT, true, true, null);
         positionOffset += secs;
+    }
 
+    @Override
+    public void volumeChange(int vol) throws IOException {
+        sendRequest(this.controlRC, "GetVolume", "<Channel>MASTER</Channel>", RENDERINGCONTROL, true, true, new VolumeUpdater(vol));
     }
 
     private String getMeta(String info, String url, String artist, String album, String title) {

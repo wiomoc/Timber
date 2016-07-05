@@ -762,7 +762,15 @@ public class MusicPlayer {
             }
         }
     }
-
+    public static boolean volumeKeyAction(boolean up){
+        if (mService != null) {
+            try {
+                return mService.volumeKeyAction(up);
+            } catch (final RemoteException ignored) {
+            }
+        }
+        return false;
+    }
     public static final class ServiceBinder implements ServiceConnection {
         private final ServiceConnection mCallback;
         private final Context mContext;

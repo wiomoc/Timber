@@ -49,5 +49,6 @@ interface ITimberService
     int getMediaMountedCount();
     int getAudioSessionId();
     void setLockscreenAlbumArt(boolean enabled);
+    boolean volumeKeyAction(boolean up);
 }
 

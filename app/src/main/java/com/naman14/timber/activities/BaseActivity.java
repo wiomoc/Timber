@@ -27,6 +27,8 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentManager;
+import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -185,7 +187,15 @@ public class BaseActivity extends ATEActivity implements ServiceConnection, Musi
         ATE.applyMenu(this, getATEKey(), menu);
         return true;
     }
-
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN){
+          return MusicPlayer.volumeKeyAction(false);
+        }else if(keyCode == KeyEvent.KEYCODE_VOLUME_UP){
+            return MusicPlayer.volumeKeyAction(true);
+        }
+        return true;
+    }
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {

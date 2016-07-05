@@ -2139,6 +2139,10 @@ public class MusicService extends Service {
         }
     }
 
+    public boolean volumeKeyAction(boolean up) {
+        return mPlayer.volumeKeyAction(up);
+    }
+
     public void refresh() {
         notifyChange(REFRESH);
     }
@@ -2565,6 +2569,15 @@ public class MusicService extends Service {
             mCurrentMediaPlayer.setAudioSessionId(sessionId);
         }
 
+        public boolean volumeKeyAction(boolean up) {
+            if (remote == null) return false;
+            try {
+                remote.volumeChange(up ? +5 : -5);
+            } catch (IOException e) {
+            }
+            return true;
+        }
+
         @Override
         public boolean onError(final MediaPlayer mp, final int what, final int extra) {
             Log.w(TAG, "Music Server Error what: " + what + " extra: " + extra);
@@ -2602,6 +2615,8 @@ public class MusicService extends Service {
                 mHandler.sendEmptyMessage(RELEASE_WAKELOCK);
             }
         }
+
+
     }
 
     private static final class ServiceStub extends ITimberService.Stub {
@@ -2845,6 +2860,12 @@ public class MusicService extends Service {
         @Override
         public void setLockscreenAlbumArt(boolean enabled) {
             mService.get().setLockscreenAlbumArt(enabled);
+        }
+
+
+        @Override
+        public boolean volumeKeyAction(boolean up) {
+            return mService.get().volumeKeyAction(up);
         }
 
     }
