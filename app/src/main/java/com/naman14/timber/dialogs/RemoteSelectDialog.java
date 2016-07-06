@@ -53,7 +53,7 @@ public class RemoteSelectDialog extends DialogFragment {
         Activity activity = getActivity();
         activity.sendBroadcast(new Intent(REMOTE_START_SCAN));
         adapter = new RemoteAdapter(activity);
-        adapter.add(new RemoteObject(0, "Local", BitmapFactory.decodeResource(activity.getResources(),R.mipmap.ic_launcher), IRemote.Type.LOCAL));
+        adapter.add(new RemoteObject(0, "Local", BitmapFactory.decodeResource(activity.getResources(), R.mipmap.ic_launcher), IRemote.Type.LOCAL));
         broadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -70,7 +70,7 @@ public class RemoteSelectDialog extends DialogFragment {
                             Toast.makeText(context, "Connected to " + connected.name, Toast.LENGTH_SHORT).show();
 
                         } else if (state == REMOTE_ERROR) {
-                            Toast.makeText(context,"Error, Remote:"+connected.name,Toast.LENGTH_SHORT).show();
+                            Toast.makeText(context, "Error, Remote:" + connected.name, Toast.LENGTH_SHORT).show();
                         }
                         Fragment prev = getFragmentManager().findFragmentByTag(FRAGMENT_NAME);
                         if (prev != null) {
@@ -85,7 +85,7 @@ public class RemoteSelectDialog extends DialogFragment {
 
         listView = new ListView(activity);
         listView.setAdapter(adapter);
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener(){
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                                             @Override
                                             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                                                 int id = ((RemoteObject) view.getTag()).id;
@@ -97,7 +97,7 @@ public class RemoteSelectDialog extends DialogFragment {
 
         );
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener(){
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
 
                     }
@@ -106,8 +106,9 @@ public class RemoteSelectDialog extends DialogFragment {
         ).setView(listView);
         return builder.create();
     }
+
     @Override
-    public void onStart(){
+    public void onStart() {
         super.onStart();
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(REMOTE_FOUND);
@@ -116,13 +117,15 @@ public class RemoteSelectDialog extends DialogFragment {
         activity.registerReceiver(broadcastReceiver, intentFilter);
         activity.sendBroadcast(new Intent(REMOTE_START_SCAN));
     }
+
     @Override
-    public void onStop(){
+    public void onStop() {
         super.onStop();
-        Activity activity =  getActivity();
+        Activity activity = getActivity();
         activity.unregisterReceiver(broadcastReceiver);
         activity.sendBroadcast(new Intent(REMOTE_STOP_SCAN));
     }
+
     private class RemoteAdapter extends ArrayAdapter<RemoteObject> {
         private Activity con;
 
@@ -145,7 +148,14 @@ public class RemoteSelectDialog extends DialogFragment {
 
             final TextView textView = (TextView) rowView.findViewById(R.id.remoteName);
             textView.setText(remoteObject.name);
-            if(remoteObject.image!=null) {
+            if (remoteObject.type == IRemote.Type.CHROMECAST) {
+               /* ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
+                imgview.setImageDrawable(getResources().getDrawable(R.drawable.ic_chromecast));
+                textView.setTextColor(Color.BLACK);
+                rowView.setBackgroundColor(Color.WHITE);*/
+                remoteObject.image = BitmapFactory.decodeResource(getResources(),R.drawable.ic_chromecast);
+            }
+            if (remoteObject.image != null) {
                 ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
                 imgview.setImageBitmap(remoteObject.image);
                 final View finalRowView = rowView;

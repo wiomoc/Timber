@@ -20,6 +20,7 @@ import com.google.android.gms.common.api.Status;
 import com.google.android.gms.common.images.WebImage;
 
 import java.io.IOException;
+import java.util.Date;
 
 import static com.google.android.gms.cast.CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID;
 
@@ -36,6 +37,9 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
     private Cast.Listener mCastListener;
     private GoogleApiClient mApiClient;
     private RemoteMediaPlayer mRemoteMediaPlayer;
+    private long positionLast;
+    private long positionStart;
+    private int positionOffset;
 
 
     ChromeCast(CastDevice device, Context con) {
@@ -127,24 +131,54 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
 
     @Override
     public void play() throws IOException {
-
+        new Thread() {
+            public void run() {
+                beginWork();
+                mRemoteMediaPlayer.play(mApiClient);
+                positionStart = new Date().getTime();
+                loadPosition();
+                endWork();
+            }
+        }.start();
     }
 
     @Override
     public void stop() throws IOException {
-
+        new Thread() {
+            public void run() {
+                beginWork();
+                mRemoteMediaPlayer.stop(mApiClient);
+                positionOffset += new Date().getTime() - positionStart;
+                positionStart = -1;
+                endWork();
+            }
+        }.start();
     }
 
     @Override
     public void pause() throws IOException {
-        beginWork();
-        mRemoteMediaPlayer.pause(mApiClient);
-        endWork();
+        new Thread() {
+            public void run() {
+                beginWork();
+                mRemoteMediaPlayer.pause(mApiClient);
+                positionOffset += new Date().getTime() - positionStart;
+                positionStart = -1;
+                loadPosition();
+                endWork();
+            }
+        }.start();
     }
 
     @Override
-    public void seek(int sec) throws IOException {
-
+    public void seek(final int sec) throws IOException {
+        new Thread() {
+            public void run() {
+                beginWork();
+                mRemoteMediaPlayer.seek(mApiClient,sec);
+                positionOffset += sec;
+                endWork();
+            }
+        }.start();
     }
 
     @Override
@@ -156,14 +190,34 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
     public void setEventListener(IRemoteEvent listener) {
 
     }
+    void loadPosition(){
+        new Thread() {
+            public void run() {
+                beginWork();
 
+                positionOffset = (int) mRemoteMediaPlayer.getApproximateStreamPosition();
+                positionStart = new Date().getTime();
+                endWork();
+            }
+        }.start();
+    }
     @Override
     public int getPosition() {
-        return 0;
+        long time = new Date().getTime();
+        if (time > positionLast + 3000) {
+            positionLast = time;
+            loadPosition();
+        }
+        if (positionStart != -1) {
+            return (int) (positionOffset + (time - positionStart));
+        }
+
+        return positionOffset;
     }
 
     @Override
     public Bitmap getImage() {
+        //return TimberUtils.loadBitmapByURL(device.getIcon(90,90).getUrl().toString());
         return null;
     }
 

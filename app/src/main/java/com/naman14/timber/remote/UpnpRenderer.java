@@ -1,8 +1,9 @@
 package com.naman14.timber.remote;
 
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.util.Log;
+
+import com.naman14.timber.utils.TimberUtils;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -278,20 +279,7 @@ public class UpnpRenderer implements IRemote, Runnable {
 
     public Bitmap getImage() {
         Log.d("img", mImgUrl);
-        InputStream instr = null;
-        try {
-            URL url = new URL(mImgUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            instr = connection.getInputStream();
-            return BitmapFactory.decodeStream(instr);
-        } catch (IOException e) {
-            return null;
-        } finally {
-            if (instr != null) try {
-                instr.close();
-            } catch (IOException e) {
-            }
-        }
+        return TimberUtils.loadBitmapByURL(mImgUrl);
     }
 
     private void sendXMLPostAsync(String urls, String content, String action, RequestRunnable runnable) {

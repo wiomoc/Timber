@@ -49,8 +49,14 @@ public class ChromeCastScanner {
         public void onRouteAdded(MediaRouter router, MediaRouter.RouteInfo route) {
             Log.d("added", route.toString());
             CastDevice SelectedDevice = CastDevice.getFromBundle(route.getExtras());
-            ChromeCast cast = new ChromeCast(SelectedDevice, con);
-            mCallback.onRenderFound(cast);
+            final ChromeCast cast = new ChromeCast(SelectedDevice, con);
+            new Thread(){
+                @Override
+                public void run() {
+                    mCallback.onRenderFound(cast);
+                }
+            }.start();
+
 
         }
     }

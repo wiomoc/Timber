@@ -20,6 +20,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.audiofx.AudioEffect;
 import android.net.Uri;
@@ -30,6 +32,11 @@ import android.util.TypedValue;
 
 import com.naman14.timber.MusicPlayer;
 import com.naman14.timber.R;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class TimberUtils {
 
@@ -179,6 +186,21 @@ public class TimberUtils {
             return null;
         }
     }
-
+    public static Bitmap loadBitmapByURL(String surl){
+        InputStream instr = null;
+        try {
+            URL url = new URL(surl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            instr = connection.getInputStream();
+            return BitmapFactory.decodeStream(instr);
+        } catch (IOException e) {
+            return null;
+        } finally {
+            if (instr != null) try {
+                instr.close();
+            } catch (IOException e) {
+            }
+        }
+    }
 
 }
