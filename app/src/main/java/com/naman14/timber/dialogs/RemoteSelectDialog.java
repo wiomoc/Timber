@@ -11,6 +11,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v7.graphics.Palette;
 import android.view.LayoutInflater;
@@ -157,13 +158,16 @@ public class RemoteSelectDialog extends DialogFragment {
             final TextView textView = (TextView) rowView.findViewById(R.id.remoteName);
             textView.setText(remoteObject.name);
             if (remoteObject.type == IRemote.Type.CHROMECAST) {
-               /* ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
+                ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
                 imgview.setImageDrawable(getResources().getDrawable(R.drawable.ic_chromecast));
                 textView.setTextColor(Color.BLACK);
-                rowView.setBackgroundColor(Color.WHITE);*/
-                remoteObject.image = BitmapFactory.decodeResource(getResources(), R.drawable.ic_chromecast);
-            }
-            if (remoteObject.image != null) {
+                rowView.setBackgroundColor(Color.WHITE);
+            } else if (remoteObject.type == IRemote.Type.AIRPLAY) {
+                ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
+                imgview.setImageDrawable(getResources().getDrawable(R.drawable.ic_airplay));
+                textView.setTextColor(Color.WHITE);
+                rowView.setBackgroundColor(Color.BLACK);
+            } else if (remoteObject.image != null) {
                 ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);
                 imgview.setImageBitmap(remoteObject.image);
                 final View finalRowView = rowView;

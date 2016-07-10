@@ -68,6 +68,7 @@ import com.naman14.timber.permissions.Nammu;
 import com.naman14.timber.provider.MusicPlaybackState;
 import com.naman14.timber.provider.RecentStore;
 import com.naman14.timber.provider.SongPlayCount;
+import com.naman14.timber.remote.AirPlayScanner;
 import com.naman14.timber.remote.ChromeCastScanner;
 import com.naman14.timber.remote.IRemote;
 import com.naman14.timber.remote.IRemoteEvent;
@@ -190,8 +191,6 @@ public class MusicService extends Service {
     private long mNotificationPostTime = 0;
     private boolean mQueueIsSaveable = true;
     private boolean mPausedByTransientLossOfFocus = false;
-    private ArrayList<IRemote> remoteObjects = new ArrayList<>();
-    private UpnpRendererScanner upnpRendererScanner;
     private MediaSessionCompat mSession;
 
     private ComponentName mMediaButtonReceiverComponent;
@@ -242,8 +241,12 @@ public class MusicService extends Service {
         }
     };
     private ContentObserver mMediaStoreObserver;
+
+    private ArrayList<IRemote> remoteObjects = new ArrayList<>();
+    private UpnpRendererScanner upnpRendererScanner;
     private IRemoteScanFound mRemoteScanFound;
     private ChromeCastScanner chromeCastScanner;
+    private AirPlayScanner airPlayScanner;
 
     @Override
     public IBinder onBind(final Intent intent) {
@@ -533,17 +536,22 @@ public class MusicService extends Service {
                     }
                 };
             }
+
             if (upnpRendererScanner == null) upnpRendererScanner = new UpnpRendererScanner();
             upnpRendererScanner.startScan(mRemoteScanFound);
 
             if (chromeCastScanner == null) chromeCastScanner = new ChromeCastScanner(this);
             chromeCastScanner.startScan(mRemoteScanFound);
 
+            if (airPlayScanner == null) airPlayScanner = new AirPlayScanner();
+            airPlayScanner.startScan(mRemoteScanFound,this);
+
 
         } else if (RemoteSelectDialog.REMOTE_STOP_SCAN.equals(action)) {
 
             if (upnpRendererScanner != null) upnpRendererScanner.stopScan();
             if (chromeCastScanner != null) chromeCastScanner.stopScan();
+            if (airPlayScanner != null) airPlayScanner.stopScan();
         } else if (RemoteSelectDialog.REMOTE_CONNECT.equals(action)) {
             int id = intent.getIntExtra(RemoteSelectDialog.REMOTE_ID, 0);
             if (upnpRendererScanner != null) upnpRendererScanner.stopScan();

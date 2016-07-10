@@ -52,11 +52,11 @@ public class Server extends NanoHTTPD {
 
     private Server() {
         super(45840);
-        this.ip = getDeviceIP();
+        this.ip = getDeviceIP().getHostAddress();
 
     }
 
-    private static String getDeviceIP() {
+    static InetAddress getDeviceIP() {
 
         try {
             for (Enumeration<NetworkInterface> en = NetworkInterface
@@ -70,7 +70,7 @@ public class Server extends NanoHTTPD {
                     InetAddress inetAdress = enumIpAddr.nextElement();
                     if (!inetAdress.isLoopbackAddress() && inetAdress instanceof Inet4Address) {
 
-                        return inetAdress.getHostAddress().toString();
+                        return inetAdress;
                     }
                 }
             }

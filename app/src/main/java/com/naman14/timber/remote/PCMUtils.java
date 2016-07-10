@@ -116,7 +116,6 @@ public class PCMUtils {
             noOutputCounter++;
             if (!sawInputEOS) {
                 inputBufIndex = codec.dequeueInputBuffer(kTimeOutUs);
-                Log.d(LOG_TAG, " bufIndexCheck " + inputBufIndex);
                 if (inputBufIndex >= 0) {
                     ByteBuffer dstBuf = codecInputBuffers[inputBufIndex];
 
@@ -142,7 +141,6 @@ public class PCMUtils {
             }
             int res = codec.dequeueOutputBuffer(info, kTimeOutUs);
             if (res >= 0) {
-
                 Log.d(LOG_TAG, "got frame, size " + info.size + "/" + info.presentationTimeUs);
                 if (info.size > 0) {
                     noOutputCounter = 0;

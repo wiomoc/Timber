@@ -13,21 +13,22 @@ public class UpnpRendererScanner {
     private Thread mWorkerThread;
     IRemoteScanFound mCallback;
     MulticastSocket mSocket;
-
+    ArrayList<String> Urls = new ArrayList<>();
     final static String SERVICE_NAME = "urn:schemas-upnp-org:device:MediaRenderer:1";
-    final static byte[] SEARCH_REQUEST = ("M-SEARCH * HTTP/1.1\r\nHost: 239.255.255.250:1900\r\nST: " + SERVICE_NAME + "\r\nMan: \"ssdp:discover\"\r\nMX: 3\r\n\r\n").getBytes();
+    final static byte[] SEARCH_REQUEST0 = ("M-SEARCH * HTTP/1.1\r\nST: " + SERVICE_NAME + "\r\nHost: 239.255.255.250:1900\nMan: \"ssdp:discover\"\r\nMX: 3\r\n\r\n").getBytes();
+    final static byte[] SEARCH_REQUEST1 = ("M-SEARCH * HTTP/1.1\r\nST: " + UpnpRenderer.AVTRANSPORT + "\r\nHost: 239.255.255.250:1900\r\nMan: \"ssdp:discover\"\r\nMX: 3\r\n\r\n").getBytes();
 
     private class ScannerWorker implements Runnable {
         @Override
         public void run() {
 
             try {
-                ArrayList<String> Urls = new ArrayList<>();
+
                 InetAddress addr = Inet4Address.getByAddress(new byte[]{(byte) 239, (byte) 255, (byte) 255, (byte) 250});
                 mSocket = new MulticastSocket(1900);
                 mSocket.setReuseAddress(true);
                 mSocket.joinGroup(addr);
-                mSocket.setSoTimeout(2000);
+                mSocket.setSoTimeout(1000);
                 search(addr);
                 while (true) {
                     byte[] buf = new byte[1000];
@@ -71,7 +72,9 @@ public class UpnpRendererScanner {
         }
 
         private void search(InetAddress addr) throws IOException {
-            DatagramPacket searchPack = new DatagramPacket(SEARCH_REQUEST, SEARCH_REQUEST.length, addr, 1900);
+            DatagramPacket searchPack = new DatagramPacket(SEARCH_REQUEST0, SEARCH_REQUEST0.length, addr, 1900);
+            mSocket.send(searchPack);
+            searchPack = new DatagramPacket(SEARCH_REQUEST1, SEARCH_REQUEST1.length, addr, 1900);
             mSocket.send(searchPack);
         }
 
@@ -89,5 +92,6 @@ public class UpnpRendererScanner {
         if (mWorkerThread == null) return;
         if (!mWorkerThread.isAlive()) return;
         mSocket.close();
+        mWorkerThread=null;
     }
 }

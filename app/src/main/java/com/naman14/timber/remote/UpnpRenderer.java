@@ -366,7 +366,12 @@ public class UpnpRenderer implements IRemote, Runnable {
             String ending = file.substring(file.lastIndexOf('.') + 1);
             String info = null;
             if (mSuppMIMEs != null) {
-                String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ending);
+                String mime;
+                if(ending.equals("m4a")){
+                    mime = "audio/mp4";
+                }else {
+                    mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ending);
+                }
                 Log.d("MIME", mime);
                 info = mSuppMIMEs.get(mime);
             }
@@ -382,10 +387,9 @@ public class UpnpRenderer implements IRemote, Runnable {
             mServer = Server.getServer();
             String audioUrl;
             if (info == null) {
-                String wavemime = mSuppMIMEs.get("audio/L16");
-                if (wavemime == null) return;
-                audioUrl = mServer.addResource(file, wavemime, true);
-                info = wavemime;
+                info = mSuppMIMEs.get("audio/L16");
+                if (info == null) return;
+                audioUrl = mServer.addResource(file, info, true);
             } else {
                 audioUrl = mServer.addResource(file, info);
             }

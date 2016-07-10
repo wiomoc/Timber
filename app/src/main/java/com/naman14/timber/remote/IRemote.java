@@ -10,7 +10,7 @@ import java.io.IOException;
 public interface IRemote {
 
     public enum Type {
-        LOCAL, UPNP, CHROMECAST;
+        LOCAL, UPNP, CHROMECAST, AIRPLAY;
     }
 
     void connect();
