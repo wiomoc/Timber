@@ -1,7 +1,10 @@
 package com.naman14.timber.remote;
 
 import android.graphics.Bitmap;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.util.Log;
+import android.webkit.MimeTypeMap;
 
 import com.naman14.timber.utils.TimberUtils;
 
@@ -32,6 +35,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 public class UpnpRenderer implements IRemote, Runnable {
+    private HashMap<String, String> mSuppMIMEs;
+
     @Override
     public void run() {
         synchronized (queue) {
@@ -106,7 +111,6 @@ public class UpnpRenderer implements IRemote, Runnable {
     private String mInstanceID = "0";
     private String mName;
     private String mImgUrl;
-    private HashMap<String, String> mSuppFormats = null;
     final static String AVTRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1";
     final static String CONNECTIONMANAGER = "urn:schemas-upnp-org:service:ConnectionManager:1";
     final static String RENDERINGCONTROL = "urn:schemas-upnp-org:service:RenderingControl:1";
@@ -183,9 +187,8 @@ public class UpnpRenderer implements IRemote, Runnable {
         getSupportedFormats();
         registerEvent(eventAVT, false);
         registerEvent(eventRC, false);
-        for (Map.Entry<String, String> ent : mSuppFormats.entrySet()) {
-            Log.d(ent.getKey(), ent.getValue());
-        }
+        for (Map.Entry<String, String> mime : mSuppMIMEs.entrySet())
+            Log.d("Formats", mime.getValue());
     }
 
     public void setEventListener(IRemoteEvent event) {
@@ -200,11 +203,17 @@ public class UpnpRenderer implements IRemote, Runnable {
     }
 
     public void close() {
-        registerEvent(eventAVT, true);
-        registerEvent(eventRC, true);
-        if (thread != null && thread.isAlive()) {
-            thread.interrupt();
-        }
+        new Thread() {
+            @Override
+            public void run() {
+                registerEvent(eventAVT, true);
+                registerEvent(eventRC, true);
+                if (thread != null && thread.isAlive()) {
+                    thread.interrupt();
+                }
+            }
+        }.start();
+
     }
 
     private void registerEvent(String urlstr, boolean unregister) {
@@ -239,21 +248,14 @@ public class UpnpRenderer implements IRemote, Runnable {
             String res = doc.getElementsByTagName("Sink").item(0).getTextContent();
             if (res == null) return;
             String[] res2 = res.split(",");
-            mSuppFormats = new HashMap<String, String>();
+            mSuppMIMEs = new HashMap<String, String>();
             for (String res3 : res2) {
-                Log.d("FORMATS", res3);
-                if (res3.contains("http-get") && res3.contains("audio")) {
-                    if (res3.contains("mp3") || res3.contains("MP3")) {
-                        mSuppFormats.put("mp3", res3);
-                    } else if (res3.contains("wma")) {
-                        mSuppFormats.put("wma", res3);
-                    } else if (res3.contains("wav")) {
-                        mSuppFormats.put("wav", res3);
-                    } else if (res3.contains("m4a") || res3.contains("mp4")) {
-                        mSuppFormats.put("mp4", res3);
-                        mSuppFormats.put("m4a", res3);
-                    }
-                }
+                String[] res4 = res3.split(":");
+                if (!res4[0].equals("http-get")) continue;
+                if (res4.length < 3) continue;
+                String mime = res4[2];
+                if (!mime.startsWith("audio")) continue;
+                mSuppMIMEs.put(mime, res3);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -363,12 +365,30 @@ public class UpnpRenderer implements IRemote, Runnable {
         try {
             String ending = file.substring(file.lastIndexOf('.') + 1);
             String info = null;
-            if (mSuppFormats != null) {
-                info = mSuppFormats.get(ending);
+            if (mSuppMIMEs != null) {
+                String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ending);
+                Log.d("MIME", mime);
+                info = mSuppMIMEs.get(mime);
+            }
+            if (info == null) {
+                MediaExtractor extractor = new MediaExtractor();
+                extractor.setDataSource(file);
+                MediaFormat format = extractor.getTrackFormat(0);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                if (mime == null) return;
+                info = mSuppMIMEs.get(mime);
+                extractor.release();
             }
             mServer = Server.getServer();
-
-            String audioUrl = mServer.addResource(file, info);
+            String audioUrl;
+            if (info == null) {
+                String wavemime = mSuppMIMEs.get("audio/L16");
+                if (wavemime == null) return;
+                audioUrl = mServer.addResource(file, wavemime, true);
+                info = wavemime;
+            } else {
+                audioUrl = mServer.addResource(file, info);
+            }
             String coverUrl = "";
             if (cover != null)
                 coverUrl = mServer.addResource(cover, null);
@@ -379,6 +399,7 @@ public class UpnpRenderer implements IRemote, Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
         positionOffset = 0;
     }
 
@@ -412,7 +433,7 @@ public class UpnpRenderer implements IRemote, Runnable {
     }
 
     private String getMeta(String info, String url, String artist, String album, String title, String cover) {
-        String tmp = "&lt;res duration=&quot;0:04:45.246&quot; bitrate=&quot;40000&quot; protocolInfo=&quot;" + info + "&quot; sampleFrequency=&quot;44100&quot; bitsPerSample=&quot;16&quot; nrAudioChannels=&quot;2&quot;&gt;" + url + "&lt;/res&gt;";
+        String tmp = "&lt;res duration=&quot;0:04:45.246&quot; bitrate=&quot;176400&quot; protocolInfo=&quot;" + info + "&quot; sampleFrequency=&quot;44100&quot; bitsPerSample=&quot;16&quot; nrAudioChannels=&quot;2&quot;&gt;" + url + "&lt;/res&gt;";
         String x = META0 + tmp;
         if (title != null) x += (META_TITLE0 + title + META_TITLE1);
         if (album != null) x += (META_ALBUM0 + album + META_ALBUM1);
@@ -434,7 +455,7 @@ public class UpnpRenderer implements IRemote, Runnable {
         return Type.UPNP;
     }
 
-    static void setMethod(HttpURLConnection httpURLConnection, String method) {
+    private static void setMethod(HttpURLConnection httpURLConnection, String method) {
         try {
             httpURLConnection.setRequestMethod(method);
         } catch (final ProtocolException pe) {

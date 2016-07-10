@@ -32,6 +32,7 @@ public class Server extends NanoHTTPD {
     private class UriInfo {
         String uri;
         String info;
+        boolean transcode;
     }
 
     private IRemoteEvent.RemoteState lastState;
@@ -80,14 +81,21 @@ public class Server extends NanoHTTPD {
     }
 
     String addResource(String path, String info) {
+        return addResource(path, info, false);
+    }
+
+    String addResource(String path, String info, boolean transcode) {
         int last = path.lastIndexOf('.');
         String uri = String.valueOf(new Random().nextInt(100000000));
-        if (last > path.length() - 7) uri += path.substring(last);
+        if (!transcode && last > path.length() - 7) uri += path.substring(last);
+        else if (transcode) uri += ".lpcm";
         UriInfo ui = new UriInfo();
         ui.uri = path;
         ui.info = info;
+        ui.transcode = transcode;
         resou.put(uri, ui);
-        return "http://" + ip + ":45840/media/"+uri;
+        Log.d("added", uri);
+        return "http://" + ip + ":45840/media/" + uri;
     }
 
     public void setEventListener(IRemoteEvent eventCallback) {
@@ -97,26 +105,31 @@ public class Server extends NanoHTTPD {
     private Response sendFile(String uri, Method meth) {
         if (uri == null || "".equals(uri)) return null;
         UriInfo ui = resou.get(uri);
+        Log.d("send", uri + " " + ui.transcode);
         String filename = ui.uri;
         if (filename == null) return null;
         try {
             File file = new File(filename);
-
-            InputStream in = new FileInputStream(file);
-
             Response res;
             long len = file.length();
             if (ui.info != null) {
                 String[] meta = ui.info.split(":");
-                if (meth == Method.GET) res = new Response(Response.Status.OK, meta[2], in, len);
-                else if (meth == Method.HEAD) res = new Response(Response.Status.OK, meta[2], "");
-                else return null;
+                if (meth == Method.GET) {
+                    if (ui.transcode) {
+                        return new PCMUtils.TrancodingResponse(ui.uri, meta[3]);
+                    }
+                    InputStream in = new FileInputStream(file);
+                    res = new Response(Response.Status.OK, meta[2], in, len);
+                } else if (meth == Method.HEAD) {
+                    res = new Response(Response.Status.OK, meta[2], "");
+                } else return null;
 
                 if (meta.length > 3) res.addHeader("ContentFeatures.DLNA.ORG", meta[3]);
             } else {
+                InputStream in = new FileInputStream(file);
                 res = new Response(Response.Status.OK, "image/jpeg", in, len);
             }
-            res.addHeader("Content-Range", "bytes 0-" + len + "/" + len);
+            if (!ui.transcode) res.addHeader("Content-Range", "bytes 0-" + len + "/" + len);
             res.addHeader("Scid.DLNA.ORG", "134252567");
             res.addHeader("TransferMode.DLNA.ORG", "Streaming");
             return res;

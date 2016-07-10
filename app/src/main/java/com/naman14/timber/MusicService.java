@@ -548,18 +548,14 @@ public class MusicService extends Service {
             int id = intent.getIntExtra(RemoteSelectDialog.REMOTE_ID, 0);
             if (upnpRendererScanner != null) upnpRendererScanner.stopScan();
             if (chromeCastScanner != null) chromeCastScanner.stopScan();
-            if (id == 0) {
-                mPlayer.setRemote(null);
-            } else {
-
-                IRemote rend = remoteObjects.get(id - 1);
+                IRemote rend = (id==0)?null:remoteObjects.get(id - 1);
                 if (mPlayer.remote != rend) {
                     Intent intentChange = new Intent(RemoteSelectDialog.REMOTE_STATE_CHANGE);
                     intentChange.putExtra(RemoteSelectDialog.REMOTE_ID, id);
                     intentChange.putExtra(RemoteSelectDialog.REMOTE_STATE, RemoteSelectDialog.REMOTE_CONNECTED);
                     sendBroadcast(intentChange);
                     mPlayer.setRemote(rend);
-                }
+
             }
 
         }
@@ -2372,6 +2368,7 @@ public class MusicService extends Service {
             this.release();
             mIsInitialized = true;
             if (remote != null) {
+                mCurrentMediaPlayer.release();
                 remote.connect();
                 remote.setEventListener(new IRemoteEvent() {
                     @Override
@@ -2380,6 +2377,8 @@ public class MusicService extends Service {
                         mService.get().notifyChange(PLAYSTATE_CHANGED);
                     }
                 });
+            }else{
+                mCurrentMediaPlayer  = new MediaPlayer();
             }
             this.remote = remote;
             setDataSource(mService.get().getPath());

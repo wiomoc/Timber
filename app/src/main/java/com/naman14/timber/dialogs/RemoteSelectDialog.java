@@ -28,6 +28,8 @@ import com.naman14.timber.remote.IRemote;
 import com.naman14.timber.remote.RemoteObject;
 import com.naman14.timber.utils.TimberUtils;
 
+import java.util.ArrayList;
+
 /**
  * Created by Christoph on 27.03.2016.
  */
@@ -36,6 +38,7 @@ public class RemoteSelectDialog extends DialogFragment {
     RemoteAdapter adapter;
     RemoteObject connected;
     BroadcastReceiver broadcastReceiver;
+    static ArrayList<RemoteObject> remotes = new ArrayList<>();
     public static final String FRAGMENT_NAME = "RemoteSelect";
     public static final String REMOTE_FOUND = "de.wiomoc.Timber.RemoteFound";
     public static final String REMOTE_START_SCAN = "de.wiomoc.Timber.StartScan";
@@ -54,13 +57,18 @@ public class RemoteSelectDialog extends DialogFragment {
         activity.sendBroadcast(new Intent(REMOTE_START_SCAN));
         adapter = new RemoteAdapter(activity);
         adapter.add(new RemoteObject(0, "Local", BitmapFactory.decodeResource(activity.getResources(), R.mipmap.ic_launcher), IRemote.Type.LOCAL));
+        adapter.addAll(remotes);
         broadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 switch (intent.getAction()) {
                     case REMOTE_FOUND:
                         RemoteObject obj = intent.getParcelableExtra("Remote");
-                        if (obj != null) adapter.add(obj);
+                        if (obj != null) {
+                            adapter.add(obj);
+                            remotes.add(obj);
+                        }
+
                         break;
                     case REMOTE_STATE_CHANGE:
                         int state = intent.getIntExtra(RemoteSelectDialog.REMOTE_STATE, REMOTE_ERROR);
@@ -153,7 +161,7 @@ public class RemoteSelectDialog extends DialogFragment {
                 imgview.setImageDrawable(getResources().getDrawable(R.drawable.ic_chromecast));
                 textView.setTextColor(Color.BLACK);
                 rowView.setBackgroundColor(Color.WHITE);*/
-                remoteObject.image = BitmapFactory.decodeResource(getResources(),R.drawable.ic_chromecast);
+                remoteObject.image = BitmapFactory.decodeResource(getResources(), R.drawable.ic_chromecast);
             }
             if (remoteObject.image != null) {
                 ImageView imgview = (ImageView) rowView.findViewById(R.id.remoteImage);

@@ -40,6 +40,7 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
     private long positionLast;
     private long positionStart;
     private int positionOffset;
+    private int volume = 50;
 
 
     ChromeCast(CastDevice device, Context con) {
@@ -118,6 +119,10 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
                 .setContentType("audio/*")
                 .setMetadata(movieMetadata)
                 .build();
+        if (mConnected) {
+            mRemoteMediaPlayer.load(mApiClient, mediaInfo);
+            return;
+        }
         new Thread() {
             public void run() {
                 beginWork();
@@ -131,12 +136,24 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
 
     @Override
     public void play() throws IOException {
-        new Thread() {
-            public void run() {
-                beginWork();
+        if (mConnected) {
+            try {
                 mRemoteMediaPlayer.play(mApiClient);
                 positionStart = new Date().getTime();
                 loadPosition();
+            } catch (IllegalStateException e) {
+            }
+            return;
+        }
+        new Thread() {
+            public void run() {
+                beginWork();
+                try {
+                    mRemoteMediaPlayer.play(mApiClient);
+                    positionStart = new Date().getTime();
+                    loadPosition();
+                } catch (IllegalStateException e) {
+                }
                 endWork();
             }
         }.start();
@@ -144,12 +161,24 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
 
     @Override
     public void stop() throws IOException {
-        new Thread() {
-            public void run() {
-                beginWork();
+        if (mConnected) {
+            try {
                 mRemoteMediaPlayer.stop(mApiClient);
                 positionOffset += new Date().getTime() - positionStart;
                 positionStart = -1;
+            } catch (IllegalStateException e) {
+            }
+            return;
+        }
+        new Thread() {
+            public void run() {
+                beginWork();
+                try {
+                    mRemoteMediaPlayer.stop(mApiClient);
+                    positionOffset += new Date().getTime() - positionStart;
+                    positionStart = -1;
+                } catch (IllegalStateException e) {
+                }
                 endWork();
             }
         }.start();
@@ -157,13 +186,26 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
 
     @Override
     public void pause() throws IOException {
-        new Thread() {
-            public void run() {
-                beginWork();
+        if (mConnected) {
+            try {
                 mRemoteMediaPlayer.pause(mApiClient);
                 positionOffset += new Date().getTime() - positionStart;
                 positionStart = -1;
                 loadPosition();
+            } catch (IllegalStateException e) {
+            }
+            return;
+        }
+        new Thread() {
+            public void run() {
+                beginWork();
+                try {
+                    mRemoteMediaPlayer.pause(mApiClient);
+                    positionOffset += new Date().getTime() - positionStart;
+                    positionStart = -1;
+                    loadPosition();
+                } catch (IllegalStateException e) {
+                }
                 endWork();
             }
         }.start();
@@ -171,11 +213,22 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
 
     @Override
     public void seek(final int sec) throws IOException {
+        if (mConnected) {
+            try {
+                mRemoteMediaPlayer.seek(mApiClient, sec);
+                positionOffset += sec;
+            } catch (IllegalStateException e) {
+            }
+            return;
+        }
         new Thread() {
             public void run() {
                 beginWork();
-                mRemoteMediaPlayer.seek(mApiClient,sec);
-                positionOffset += sec;
+                try {
+                    mRemoteMediaPlayer.seek(mApiClient, sec);
+                    positionOffset += sec;
+                } catch (IllegalStateException e) {
+                }
                 endWork();
             }
         }.start();
@@ -183,24 +236,49 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
 
     @Override
     public void volumeChange(int vol) throws IOException {
+        volume += vol;
+        if (mConnected) {
+            try {
+                Cast.CastApi.setVolume(mApiClient, volume / 100.0);
+            } catch (IOException e) {
 
+            }
+            return;
+        }
+        new Thread() {
+            public void run() {
+                beginWork();
+                try {
+                    Cast.CastApi.setVolume(mApiClient, volume / 100.0);
+                } catch (IOException e) {
+
+                }
+                endWork();
+            }
+        }.start();
     }
 
     @Override
     public void setEventListener(IRemoteEvent listener) {
 
     }
-    void loadPosition(){
+
+    private void loadPosition() {
+        if (mConnected) {
+            positionOffset = (int) mRemoteMediaPlayer.getApproximateStreamPosition();
+            positionStart = new Date().getTime();
+            return;
+        }
         new Thread() {
             public void run() {
                 beginWork();
-
                 positionOffset = (int) mRemoteMediaPlayer.getApproximateStreamPosition();
                 positionStart = new Date().getTime();
                 endWork();
             }
         }.start();
     }
+
     @Override
     public int getPosition() {
         long time = new Date().getTime();
@@ -274,6 +352,7 @@ public class ChromeCast implements IRemote, GoogleApiClient.ConnectionCallbacks,
                                                 Log.e("E", "Failed to request status.");
                                                 return;
                                             }
+                                            volume = (int) (Cast.CastApi.getVolume(mApiClient) * 100);
                                             endWork();
                                         }
                                     });

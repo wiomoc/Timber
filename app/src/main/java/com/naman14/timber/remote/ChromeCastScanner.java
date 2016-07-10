@@ -8,6 +8,8 @@ import android.util.Log;
 import com.google.android.gms.cast.Cast;
 import com.google.android.gms.cast.CastDevice;
 
+import java.util.ArrayList;
+
 import static com.google.android.gms.cast.CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID;
 import static com.google.android.gms.cast.CastMediaControlIntent.categoryForCast;
 
@@ -24,7 +26,7 @@ public class ChromeCastScanner {
     private MediaRouter mMediaRouter;
     private Cast.Listener mCastListener;
     private Context con;
-
+    private ArrayList<String> devices = new ArrayList<>();
     public ChromeCastScanner(Context con) {
         this.con = con;
         mMediaRouter = MediaRouter.getInstance(con);
@@ -49,6 +51,9 @@ public class ChromeCastScanner {
         public void onRouteAdded(MediaRouter router, MediaRouter.RouteInfo route) {
             Log.d("added", route.toString());
             CastDevice SelectedDevice = CastDevice.getFromBundle(route.getExtras());
+            String id = SelectedDevice.getDeviceId();
+            if(devices.contains(id))return;
+            devices.add(id);
             final ChromeCast cast = new ChromeCast(SelectedDevice, con);
             new Thread(){
                 @Override
