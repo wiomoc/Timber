@@ -34,10 +34,12 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.afollestad.appthemeengine.customizers.ATEActivityThemeCustomizer;
+import com.anjlab.android.iab.v3.BillingProcessor;
 import com.naman14.timber.MusicPlayer;
 import com.naman14.timber.R;
 import com.naman14.timber.fragments.AlbumDetailFragment;
 import com.naman14.timber.fragments.ArtistDetailFragment;
+import com.naman14.timber.fragments.FoldersFragment;
 import com.naman14.timber.fragments.MainFragment;
 import com.naman14.timber.fragments.PlaylistFragment;
 import com.naman14.timber.fragments.QueueFragment;
@@ -96,6 +98,16 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
         public void run() {
             navigationView.getMenu().findItem(R.id.nav_playlists).setChecked(true);
             Fragment fragment = new PlaylistFragment();
+            FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+            transaction.hide(getSupportFragmentManager().findFragmentById(R.id.fragment_container));
+            transaction.replace(R.id.fragment_container, fragment).commit();
+
+        }
+    };
+    Runnable navigateFolder = new Runnable() {
+        public void run() {
+            navigationView.getMenu().findItem(R.id.nav_folders).setChecked(true);
+            Fragment fragment = new FoldersFragment();
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
             transaction.hide(getSupportFragmentManager().findFragmentById(R.id.fragment_container));
             transaction.replace(R.id.fragment_container, fragment).commit();
@@ -196,6 +208,7 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
                 }
             }, 350);
         }
+
     }
 
     private void loadEverything() {
@@ -250,13 +263,13 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
 
     @Override
     public void onBackPressed() {
-
-        if (panelLayout.isPanelExpanded())
+        if (panelLayout.isPanelExpanded()) {
             panelLayout.collapsePanel();
-        else {
+        } else if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
+            mDrawerLayout.closeDrawer(GravityCompat.START);
+        } else {
             super.onBackPressed();
         }
-
     }
 
     private void setupDrawerContent(NavigationView navigationView) {
@@ -281,18 +294,30 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
             navigationView.getMenu().findItem(R.id.nav_library).setIcon(R.drawable.library_music);
             navigationView.getMenu().findItem(R.id.nav_playlists).setIcon(R.drawable.playlist_play);
             navigationView.getMenu().findItem(R.id.nav_queue).setIcon(R.drawable.music_note);
+            navigationView.getMenu().findItem(R.id.nav_folders).setIcon(R.drawable.ic_folder_open_black_24dp);
             navigationView.getMenu().findItem(R.id.nav_nowplaying).setIcon(R.drawable.bookmark_music);
             navigationView.getMenu().findItem(R.id.nav_settings).setIcon(R.drawable.settings);
             navigationView.getMenu().findItem(R.id.nav_help).setIcon(R.drawable.help_circle);
             navigationView.getMenu().findItem(R.id.nav_about).setIcon(R.drawable.information);
+            navigationView.getMenu().findItem(R.id.nav_donate).setIcon(R.drawable.payment_black);
         } else {
             navigationView.getMenu().findItem(R.id.nav_library).setIcon(R.drawable.library_music_white);
             navigationView.getMenu().findItem(R.id.nav_playlists).setIcon(R.drawable.playlist_play_white);
             navigationView.getMenu().findItem(R.id.nav_queue).setIcon(R.drawable.music_note_white);
+            navigationView.getMenu().findItem(R.id.nav_folders).setIcon(R.drawable.ic_folder_open_white_24dp);
             navigationView.getMenu().findItem(R.id.nav_nowplaying).setIcon(R.drawable.bookmark_music_white);
             navigationView.getMenu().findItem(R.id.nav_settings).setIcon(R.drawable.settings_white);
             navigationView.getMenu().findItem(R.id.nav_help).setIcon(R.drawable.help_circle_white);
             navigationView.getMenu().findItem(R.id.nav_about).setIcon(R.drawable.information_white);
+            navigationView.getMenu().findItem(R.id.nav_donate).setIcon(R.drawable.payment_white);
+        }
+
+        try {
+            if (!BillingProcessor.isIabServiceAvailable(this)) {
+                navigationView.getMenu().removeItem(R.id.nav_donate);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
     }
@@ -307,6 +332,10 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
                 break;
             case R.id.nav_playlists:
                 runnable = navigatePlaylist;
+
+                break;
+            case R.id.nav_folders:
+                runnable = navigateFolder;
 
                 break;
             case R.id.nav_nowplaying:
@@ -335,6 +364,9 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
                     }
                 }, 350);
 
+                break;
+            case R.id.nav_donate:
+                startActivity(new Intent(MainActivity.this, DonateActivity.class));
                 break;
         }
 
@@ -387,7 +419,7 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
     private boolean isNavigatingMain() {
         Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
         return (currentFragment instanceof MainFragment || currentFragment instanceof QueueFragment
-                || currentFragment instanceof PlaylistFragment);
+                || currentFragment instanceof PlaylistFragment || currentFragment instanceof FoldersFragment);
     }
 
     private void addBackstackListener() {
@@ -405,6 +437,11 @@ public class MainActivity extends BaseActivity implements ATEActivityThemeCustom
         return isDarkTheme ? R.style.AppThemeNormalDark : R.style.AppThemeNormalLight;
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        getSupportFragmentManager().findFragmentById(R.id.fragment_container).onActivityResult(requestCode, resultCode, data);
+    }
 }
 
 

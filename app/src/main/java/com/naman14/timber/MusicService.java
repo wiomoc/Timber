@@ -64,6 +64,9 @@ import android.util.Log;
 import com.naman14.timber.dialogs.RemoteSelectDialog;
 import com.naman14.timber.helpers.MediaButtonIntentReceiver;
 import com.naman14.timber.helpers.MusicPlaybackTrack;
+import com.naman14.timber.lastfmapi.LastFmClient;
+import com.naman14.timber.lastfmapi.models.LastfmUserSession;
+import com.naman14.timber.lastfmapi.models.ScrobbleQuery;
 import com.naman14.timber.permissions.Nammu;
 import com.naman14.timber.provider.MusicPlaybackState;
 import com.naman14.timber.provider.RecentStore;
@@ -463,7 +466,14 @@ public class MusicService extends Service {
             MediaButtonIntentReceiver.completeWakefulIntent(intent);
         }
 
-        return START_STICKY;
+        return START_NOT_STICKY; //no sense to use START_STICKY with using startForeground
+    }
+
+    void scrobble() {
+        if (LastfmUserSession.getSession(this) != null) {
+            Log.d("Scrobble", "to LastFM");
+            LastFmClient.getInstance(this).Scrobble(new ScrobbleQuery(getArtistName(), getTrackName(), (System.currentTimeMillis() - duration()) / 1000));
+        }
     }
 
     private void releaseServiceUiAndStop() {
@@ -2228,6 +2238,7 @@ public class MusicService extends Service {
                         }
                         break;
                     case TRACK_WENT_TO_NEXT:
+                        mService.get().scrobble();
                         service.setAndRecordPlayPos(service.mNextPlayPos);
                         service.setNextTrack();
                         if (service.mCursor != null) {
@@ -2239,6 +2250,7 @@ public class MusicService extends Service {
                         service.updateNotification();
                         break;
                     case TRACK_ENDED:
+                        mService.get().scrobble();
                         if (service.mRepeatMode == REPEAT_CURRENT) {
                             service.seek(0);
                             service.play();
@@ -2361,10 +2373,13 @@ public class MusicService extends Service {
 
 
         public void setDataSource(final String path) {
-            Log.d("Multi", "setSource" + path);
-            mIsInitialized = setDataSourceImpl(mCurrentMediaPlayer, path);
-            if (mIsInitialized) {
-                setNextDataSource(null);
+            try {
+                mIsInitialized = setDataSourceImpl(mCurrentMediaPlayer, path);
+                if (mIsInitialized) {
+                    setNextDataSource(null);
+                }
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
             }
             // mDuration=-1;
         }
@@ -2448,27 +2463,27 @@ public class MusicService extends Service {
         }
 
         public void setNextDataSource(final String path) {
-            Log.d("Multi", "setNextSource " + path);
             if (remote == null) {
-                mNextMediaPath = null;
-                try {
-                    mCurrentMediaPlayer.setNextMediaPlayer(null);
-                } catch (IllegalArgumentException e) {
-                    Log.i(TAG, "Next media player is current one, continuing");
-                } catch (IllegalStateException e) {
-                    Log.e(TAG, "Media player not initialized!");
-                    return;
-                }
-                if (mNextMediaPlayer != null) {
-                    mNextMediaPlayer.release();
-                    mNextMediaPlayer = null;
-                }
-                if (path == null) {
-                    return;
-                }
-                mNextMediaPlayer = new MediaPlayer();
-                mNextMediaPlayer.setWakeMode(mService.get(), PowerManager.PARTIAL_WAKE_LOCK);
-                mNextMediaPlayer.setAudioSessionId(getAudioSessionId());
+            mNextMediaPath = null;
+            try {
+                mCurrentMediaPlayer.setNextMediaPlayer(null);
+            } catch (IllegalArgumentException e) {
+                Log.i(TAG, "Next media player is current one, continuing");
+            } catch (IllegalStateException e) {
+                Log.e(TAG, "Media player not initialized!");
+                return;
+            }
+            if (mNextMediaPlayer != null) {
+                mNextMediaPlayer.release();
+                mNextMediaPlayer = null;
+            }
+            if (path == null) {
+                return;
+            }
+            mNextMediaPlayer = new MediaPlayer();
+            mNextMediaPlayer.setWakeMode(mService.get(), PowerManager.PARTIAL_WAKE_LOCK);
+            mNextMediaPlayer.setAudioSessionId(getAudioSessionId());
+            try {
                 if (setDataSourceImpl(mNextMediaPlayer, path)) {
                     mNextMediaPath = path;
                     mCurrentMediaPlayer.setNextMediaPlayer(mNextMediaPlayer);
@@ -2478,8 +2493,8 @@ public class MusicService extends Service {
                         mNextMediaPlayer = null;
                     }
                 }
-            } else {
-                // if(path!=null)remote.setMedia(path);
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
             }
         }
 
@@ -2588,9 +2603,12 @@ public class MusicService extends Service {
 
 
         public void setVolume(final float vol) {
-            Log.d("Multi", "VOL. " + vol);
             if (remote == null) {
+            try {
                 mCurrentMediaPlayer.setVolume(vol, vol);
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
+            }
             }
         }
 

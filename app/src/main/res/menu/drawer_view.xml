@@ -14,6 +14,10 @@
 
             android:title="@string/playlists" />
         <item
+            android:id="@+id/nav_folders"
+
+            android:title="@string/folders" />
+        <item
             android:id="@+id/nav_queue"
 
             android:title="@string/playing_queue" />
@@ -36,8 +40,12 @@
 
             android:id="@+id/nav_about"
             android:title="@string/about" />
-        <item
 
+        <item
+            android:id="@+id/nav_donate"
+            android:title="Support development" />
+
+        <item
             android:id="@+id/nav_help"
             android:title="@string/help_and_feedback" />
     </group>

@@ -388,6 +388,15 @@ public class MusicPlayer {
         }
     }
 
+    public static void refresh() {
+        try {
+            if (mService != null) {
+                mService.refresh();
+            }
+        } catch (final RemoteException ignored) {
+        }
+    }
+
     public static final int getQueueHistorySize() {
         if (mService != null) {
             try {
@@ -655,9 +664,11 @@ public class MusicPlayer {
     }
 
     public static void clearQueue() {
-        try {
-            mService.removeTracks(0, Integer.MAX_VALUE);
-        } catch (final RemoteException ignored) {
+        if (mService!=null) {
+            try {
+                mService.removeTracks(0, Integer.MAX_VALUE);
+            } catch (final RemoteException ignored) {
+            }
         }
     }
 
